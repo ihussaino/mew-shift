@@ -197,3 +197,40 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
 .group-seg button{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;font-weight:700;font-size:16px;min-height:48px}
 .group-seg small{font-size:10.5px;font-weight:500;opacity:.85}
 .viewing{justify-content:space-between;background:var(--soft)}
+
+/* ---------- تصاميم المناسبات ---------- */
+#app{position:relative}
+.season-decor{position:absolute;top:0;left:0;right:0;pointer-events:none;z-index:0}
+.season-decor .season-art{display:block;width:100%;height:auto}
+.season-decor.ramadan{height:170px;overflow:hidden}
+.season-decor.national{top:calc(env(safe-area-inset-top) + 8px)}
+.top.with-decor{position:relative;z-index:1}
+.top.season-ramadan{margin-top:96px;align-items:flex-start}
+.top.season-national{margin-top:44px}
+.season-kicker{font-family:'Reem Kufi',sans-serif;font-size:15px;font-weight:700;color:#E8B84A;margin-bottom:2px}
+.season-title{font-family:'Reem Kufi',sans-serif;font-size:20px;color:#007A3D}
+[data-theme="dark"] .season-title{color:#3FB168}
+.season-title-sm{font-size:15px;color:#F4E3B0}
+.national-banner{display:flex;align-items:center;gap:14px;box-shadow:inset 0 -4px 0 #CE1126;position:relative;z-index:1}
+.national-banner .flag{width:64px;height:40px;border-radius:4px;flex:none}
+.lantern-ic{width:34px;height:34px;flex:none}
+
+[data-season="ramadan"]{
+  --bg:#0D1530;--card:#16204A;--ink:#EEF1F8;--muted:#B9C2D9;--line:#24305A;--border:#2C3A66;
+  --primary:#E8B84A;--on-primary:#1B1400;--soft:#1E2A55;--chip:#1E2A55;--n:#2E46A0;--ok-bg:#173A25;--ok-ink:#9BE0B0;--warn-bg:#3A2416;
+  color-scheme:dark;
+}
+[data-season="ramadan"] .shift-card{box-shadow:0 0 0 2px #E8B84A}
+[data-season="ramadan"] .s-O{box-shadow:inset 0 0 0 1px var(--border)}
+[data-season="ramadan"] .punch svg{color:#E8B84A}
+[data-season="ramadan"] .punch.done svg,[data-season="ramadan"] .punch.primary svg{color:inherit}
+[data-season="ramadan"] .nav-btn.on{color:#E8B84A}
+[data-season="ramadan"] #nav{background:#111A3A;border-top-color:#24305A}
+
+[data-season="national"]{--primary:#007A3D;--on-primary:#FFFFFF}
+[data-theme="dark"][data-season="national"]{--primary:#1F8F52}
+[data-season="national"] .nav-btn.on{color:#007A3D}
+[data-theme="dark"][data-season="national"] .nav-btn.on{color:#3FB168}
+[data-season="national"] .punch.k-in:not(.done) svg,[data-season="national"] .punch.k-att:not(.done):not(.primary) svg{color:#007A3D}
+[data-season="national"] .punch.k-out:not(.done) svg{color:#CE1126}
+[data-theme="dark"][data-season="national"] .punch.k-in:not(.done) svg{color:#3FB168}

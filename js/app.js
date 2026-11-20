@@ -6,7 +6,7 @@ const KEY = 'mewshift.v1';
 const PUSH_API = 'https://mew-shift-push.ihussain-u14.workers.dev';
 const DEFAULT = {
   settings: {
-    group: null, name: '', grade: 45, annualBase: null, annualBaseDate: null,
+    group: null, name: '', seasons: true, grade: 45, annualBase: null, annualBaseDate: null,
     lang: 'ar', themeMode: 'auto', theme: 'light',
     notify: { att: true, exit: true, balance: true }
   },
@@ -250,7 +250,9 @@ function renderToday() {
         <button type="button" class="btn" data-act="editDay" data-v="${date}">${t('enterTime')}</button>
         <button type="button" class="btn danger" data-act="forgotAtt" data-v="${date}">${t('forgotDeduct')}</button></div></section>`;
     } else {
-      main += `<section class="card info-row">${ICONS.bell}<span>${t('attWindow')} ${fmt12(win.from)} – ${fmt12(win.to)}${S.settings.notify.att ? ' · ' + t('willNotify') : ''}</span></section>`;
+      main += currentSeason() === 'ramadan'
+        ? `<section class="card info-row">${SEASON_ART.lantern}<span class="stack sm-gap"><b class="season-title-sm">${t('ramadanWish')}</b><span>${t('attWindow')} ${fmt12(win.from)} – ${fmt12(win.to)}${S.settings.notify.att ? ' · ' + t('willNotify') : ''}</span></span></section>`
+        : `<section class="card info-row">${ICONS.bell}<span>${t('attWindow')} ${fmt12(win.from)} – ${fmt12(win.to)}${S.settings.notify.att ? ' · ' + t('willNotify') : ''}</span></section>`;
     }
   } else {
     const next = nextWork(date);
@@ -274,7 +276,17 @@ function renderToday() {
       return `<button type="button" class="mini s-${s}${h ? ' has-hol' : ''}" data-act="openDay" data-v="${dd}"><span>${dayName(dd)}</span><b>${shiftName(s)}</b></button>`;
     }).join('')}</div></section>`;
 
-  return `<header class="top"><div><div class="muted">${fmtDate(todayISO())}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header>${main}`;
+  const season = currentSeason();
+  let decor = '', kicker = '', dateLine = fmtDate(todayISO()), banner = '';
+  if (season === 'ramadan') {
+    const h = hijriOf(todayISO());
+    decor = SEASON_ART.ramadan; kicker = `<div class="season-kicker">${t('ramadanKareem')}</div>`;
+    if (h) dateLine += ` · ${h.d} ${t('ramadanMonth')} ${h.y}`;
+  } else if (season === 'national') {
+    decor = SEASON_ART.national;
+    banner = `<section class="card national-banner">${SEASON_ART.flag}<div class="stack sm-gap"><b class="season-title">${t('halaFeb')}</b><span class="sm">${t('nationalWish')}</span></div></section>`;
+  }
+  return `${decor}<header class="top${decor ? ' with-decor season-' + season : ''}"><div>${kicker}<div class="muted">${dateLine}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header>${banner}${main}`;
 }
 
 /* ---------- العد التنازلي ---------- */
@@ -305,7 +317,7 @@ function punchBtn(kind, val, label, sub, primary) {
   const done = !!val;
   const cls = done ? 'punch done' : primary ? 'punch primary' : 'punch';
   const icon = done ? ICONS.check : kind === 'att' ? ICONS.clock : kind === 'out' ? ICONS.out : ICONS.in;
-  return `<button type="button" class="${cls}" data-act="punch" data-v="${kind}">${icon}<b>${label}</b><span>${done ? fmtHM(val) : esc(sub || '')}</span></button>`;
+  return `<button type="button" class="${cls} k-${kind}" data-act="punch" data-v="${kind}">${icon}<b>${label}</b><span>${done ? fmtHM(val) : esc(sub || '')}</span></button>`;
 }
 function balanceCard(title, big, small, ratio, foot, tone) {
   const pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
@@ -427,6 +439,8 @@ function renderSettings() {
       <b>${t('appearance')}</b>
       <div class="row-between"><span>${t('dayNight')}</span><div class="seg small">${segBtns('themeMode', [['auto', t('auto')], ['manual', t('manual')]], s.themeMode)}</div></div>
       ${s.themeMode === 'auto' ? `<span class="muted sm">${t('autoHint')}</span>` : `<div class="seg">${segBtns('theme', [['light', t('light')], ['dark', t('dark')]], s.theme)}</div>`}
+      <div class="row-between toggle-row"><span class="stack sm-gap"><span>${t('seasonThemes')}</span><span class="muted sm">${t('seasonHint')}</span></span>
+        <button type="button" role="switch" aria-checked="${s.seasons !== false}" aria-label="${t('seasonThemes')}" class="switch${s.seasons !== false ? ' on' : ''}" data-act="toggleSeasons"><i></i></button></div>
     </section>
     <section class="card stack">
       <b>${t('notifications')}</b>
@@ -451,7 +465,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v1.3</p>`;
+    <p class="muted sm center">MEW Shift · v1.4</p>`;
 }
 
 function renderAbout() {
@@ -552,6 +566,7 @@ document.addEventListener('click', ev => {
     case 'themeMode': S.settings.themeMode = v; save(); render(); break;
     case 'theme': S.settings.theme = v; save(); render(); break;
     case 'lang': S.settings.lang = v; save(); render(); break;
+    case 'toggleSeasons': S.settings.seasons = S.settings.seasons === false; save(); render(); break;
     case 'toggleNotify': S.settings.notify[v] = !S.settings.notify[v]; save(); render(); break;
     case 'enablePush': enablePush(); break;
     case 'disablePush': disablePush(); break;
@@ -711,11 +726,19 @@ function tick() {
 }
 
 /* ---------- المظهر ---------- */
+function currentSeason() {
+  const q = new URLSearchParams(location.search).get('season');
+  if (q === 'ramadan' || q === 'national') return q;
+  if (q === 'none' || S.settings.seasons === false) return null;
+  return seasonOf(todayISO());
+}
 function applyTheme() {
   const s = S.settings;
+  const season = currentSeason();
+  if (season) document.documentElement.dataset.season = season; else delete document.documentElement.dataset.season;
   const dark = s.themeMode === 'auto' ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) : s.theme === 'dark';
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = dark ? '#0D1320' : '#F3F5F9';
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = season === 'ramadan' ? '#0D1530' : dark ? '#0D1320' : '#F3F5F9';
 }
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.settings.themeMode === 'auto') applyTheme(); });
 
@@ -748,6 +771,14 @@ function toast(msg, strong) {
   el.textContent = msg; el.className = 'toast show' + (strong ? ' strong' : '');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.className = 'toast'; }, 3200);
 }
+
+/* رسومات تصاميم المناسبات */
+const SEASON_ART = {
+  ramadan: '<div class="season-decor ramadan"><svg class="season-art" viewBox="0 0 390 170" preserveAspectRatio="xMidYMin slice" aria-hidden="true"><circle cx="30" cy="40" r="1.4" fill="#F4E3B0" opacity="0.8"/><circle cx="80" cy="90" r="1" fill="#F4E3B0" opacity="0.6"/><circle cx="150" cy="30" r="1.2" fill="#F4E3B0" opacity="0.7"/><circle cx="210" cy="70" r="0.9" fill="#F4E3B0" opacity="0.5"/><circle cx="250" cy="25" r="1.5" fill="#F4E3B0" opacity="0.9"/><circle cx="120" cy="120" r="0.8" fill="#F4E3B0" opacity="0.5"/><circle cx="300" cy="110" r="1" fill="#F4E3B0" opacity="0.6"/><circle cx="40" cy="150" r="1" fill="#F4E3B0" opacity="0.5"/><circle cx="190" cy="140" r="1.3" fill="#F4E3B0" opacity="0.7"/><circle cx="330" cy="55" r="0.9" fill="#F4E3B0" opacity="0.6"/><circle cx="360" cy="130" r="1.1" fill="#F4E3B0" opacity="0.6"/><path d="M62 52a26 26 0 1 0 26 34a21 21 0 1 1-26-34z" fill="#F2C94C"/><g transform="translate(150,0)"><line x1="0" y1="0" x2="0" y2="30" stroke="#C9A24A" stroke-width="1.2"/><g transform="translate(0,30) scale(0.9)"><path d="M-8 0h16l-3 6h-10z" fill="#E8B84A"/><path d="M-12 6h24l-4 34h-16z" fill="#E8B84A" fill-opacity=".18" stroke="#E8B84A" stroke-width="1.6"/><path d="M-6 12h12M-7 22h14M-8 32h16" stroke="#E8B84A" stroke-width="1" opacity=".7"/><ellipse cx="0" cy="23" rx="4" ry="7" fill="#FFD27A" opacity=".85"/><path d="M-8 40h16l-3 6h-10z" fill="#E8B84A"/><circle cx="0" cy="50" r="2.2" fill="#E8B84A"/></g></g><g transform="translate(196,0)"><line x1="0" y1="0" x2="0" y2="56" stroke="#C9A24A" stroke-width="1.2"/><g transform="translate(0,56) scale(1)"><path d="M-8 0h16l-3 6h-10z" fill="#E8B84A"/><path d="M-12 6h24l-4 34h-16z" fill="#E8B84A" fill-opacity=".18" stroke="#E8B84A" stroke-width="1.6"/><path d="M-6 12h12M-7 22h14M-8 32h16" stroke="#E8B84A" stroke-width="1" opacity=".7"/><ellipse cx="0" cy="23" rx="4" ry="7" fill="#FFD27A" opacity=".85"/><path d="M-8 40h16l-3 6h-10z" fill="#E8B84A"/><circle cx="0" cy="50" r="2.2" fill="#E8B84A"/></g></g><g transform="translate(242,0)"><line x1="0" y1="0" x2="0" y2="18" stroke="#C9A24A" stroke-width="1.2"/><g transform="translate(0,18) scale(0.8)"><path d="M-8 0h16l-3 6h-10z" fill="#E8B84A"/><path d="M-12 6h24l-4 34h-16z" fill="#E8B84A" fill-opacity=".18" stroke="#E8B84A" stroke-width="1.6"/><path d="M-6 12h12M-7 22h14M-8 32h16" stroke="#E8B84A" stroke-width="1" opacity=".7"/><ellipse cx="0" cy="23" rx="4" ry="7" fill="#FFD27A" opacity=".85"/><path d="M-8 40h16l-3 6h-10z" fill="#E8B84A"/><circle cx="0" cy="50" r="2.2" fill="#E8B84A"/></g></g></svg></div>',
+  national: '<div class="season-decor national"><svg class="season-art" viewBox="0 0 390 60" preserveAspectRatio="xMidYMin slice" aria-hidden="true"><path d="M0 12 Q195 40 390 12" fill="none" stroke="#8A94A6" stroke-width="1.2"/><path d="M4 10.0h22l-11 22z" fill="#007A3D"/><path d="M32 12.2h22l-11 22z" fill="#FFFFFF" stroke="#C5CEDB" stroke-width="1"/><path d="M60 14.4h22l-11 22z" fill="#CE1126"/><path d="M88 16.6h22l-11 22z" fill="#000000"/><path d="M116 18.8h22l-11 22z" fill="#007A3D"/><path d="M144 21.0h22l-11 22z" fill="#FFFFFF" stroke="#C5CEDB" stroke-width="1"/><path d="M172 23.2h22l-11 22z" fill="#CE1126"/><path d="M200 23.2h22l-11 22z" fill="#000000"/><path d="M228 21.0h22l-11 22z" fill="#007A3D"/><path d="M256 18.8h22l-11 22z" fill="#FFFFFF" stroke="#C5CEDB" stroke-width="1"/><path d="M284 16.6h22l-11 22z" fill="#CE1126"/><path d="M312 14.4h22l-11 22z" fill="#000000"/><path d="M340 12.2h22l-11 22z" fill="#007A3D"/><path d="M368 10.0h22l-11 22z" fill="#FFFFFF" stroke="#C5CEDB" stroke-width="1"/></svg></div>',
+  flag: '<svg class="flag" viewBox="0 0 64 40" role="img" aria-label="علم الكويت"><rect width="64" height="13.34" fill="#007A3D"/><rect y="13.33" width="64" height="13.34" fill="#FFFFFF"/><rect y="26.66" width="64" height="13.34" fill="#CE1126"/><path d="M0 0l16 13.33v13.34L0 40z" fill="#000000"/></svg>',
+  lantern: '<svg class="lantern-ic" viewBox="0 0 40 40" aria-hidden="true"><path d="M14 2h12l-2 5H16z" fill="#E8B84A"/><path d="M11 7h18l-3 26H14z" fill="#E8B84A" fill-opacity=".2" stroke="#E8B84A" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="3.5" ry="6" fill="#FFD27A"/><path d="M14 33h12l-2 5H16z" fill="#E8B84A"/></svg>'
+};
 
 const ICONS = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',

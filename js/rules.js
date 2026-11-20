@@ -23,8 +23,30 @@ const RULES = {
   annualCap: 180,
   sickPerYear: 15,
   emergencyPerYear: 4,
-  bonusPercent: 70
+  bonusPercent: 70,
+  hijriAdjust: 0            // تعديل التاريخ الهجري بالأيام إذا اختلفت رؤية الهلال في الكويت عن تقويم أم القرى
 };
+
+/* التاريخ الهجري (تقويم أم القرى) */
+function hijriOf(date) {
+  try {
+    const f = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    const p = f.formatToParts(new Date(toUTC(addDays(date, -RULES.hijriAdjust))));
+    const g = k => Number((p.find(x => x.type === k) || {}).value);
+    return { d: g('day'), m: g('month'), y: g('year') };
+  } catch (e) { return null; }
+}
+function isRamadan(date) { const h = hijriOf(date); return !!h && h.m === 9; }
+
+/* تصميم المناسبة: رمضان طوال الشهر، والعيد الوطني طوال فبراير.
+   إذا تداخلا، رمضان أولاً إلا من 20 فبراير (أسبوع العيد الوطني والتحرير). */
+function seasonOf(date) {
+  const ram = isRamadan(date), feb = date.slice(5, 7) === '02';
+  if (ram && feb && date.slice(8) >= '20') return 'national';
+  if (ram) return 'ramadan';
+  if (feb) return 'national';
+  return null;
+}
 
 /* العطل الرسمية — التواريخ النهائية بعد ترحيل الجمعة إلى الأحد.
    2026: من جدول نوبات محطات الشعيبة. العطل الإسلامية لسنة 2027 تُضاف عند إعلانها. */
