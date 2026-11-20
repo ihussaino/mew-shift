@@ -1,0 +1,13 @@
+# منبّه إشعارات MEW Shift على Cloudflare Workers
+name = "mew-shift-push"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mew-shift"
+database_id = "REPLACE_WITH_DATABASE_ID"

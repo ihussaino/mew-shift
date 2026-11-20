@@ -46,7 +46,9 @@ const I18N = {
     overBalance: 'تجاوزت الرصيد الشهري',
     btnSick: 'طبية', btnEmergency: 'عارضة', sickAdded: 'سُجّلت طبية اليوم', emergencyAdded: 'سُجّلت عارضة اليوم',
     cancelLeave: 'إلغاء الإجازة', cancelLeaveQ: 'هل تريد إلغاء إجازة هذا اليوم؟', leaveCancelled: 'أُلغيت الإجازة', alreadyLeave: 'هذا اليوم مسجّل إجازة', insteadOf: 'بدل شفت',
-    cdStart: 'يبدأ دوامك بعد', cdNext: 'يبدأ شفتك القادم بعد', cdStarted: 'بدأ الدوام منذ', cdExit: 'باقي على خروجك', cdExitDone: 'حان وقت الانصراف'
+    cdStart: 'يبدأ دوامك بعد', cdNext: 'يبدأ شفتك القادم بعد', cdStarted: 'بدأ الدوام منذ', cdExit: 'باقي على خروجك', cdExitDone: 'حان وقت الانصراف',
+    enablePush: 'تفعيل الإشعارات', pushActive: 'الإشعارات التلقائية مفعّلة ✓ تصلك حتى والتطبيق مغلق', testPush: 'إشعار تجريبي', stopPush: 'إيقاف الإشعارات',
+    pushOn: 'تم تفعيل الإشعارات', pushFail: 'تعذّر تفعيل الإشعارات، حاول مرة أخرى', testSent: 'أُرسل إشعار تجريبي', installFirst: 'على الآيفون: أضف التطبيق للشاشة الرئيسية من زر المشاركة، ثم افتحه من الأيقونة وفعّل الإشعارات.'
   },
   en: {
     am: 'AM', pm: 'PM', hShort: 'h', mShort: 'm',
@@ -94,6 +96,8 @@ const I18N = {
     overBalance: 'Monthly balance exceeded',
     btnSick: 'Sick', btnEmergency: 'Emergency', sickAdded: 'Sick day recorded', emergencyAdded: 'Emergency leave recorded',
     cancelLeave: 'Cancel leave', cancelLeaveQ: 'Cancel the leave for this day?', leaveCancelled: 'Leave cancelled', alreadyLeave: 'This day is already leave', insteadOf: 'Instead of',
-    cdStart: 'Your shift starts in', cdNext: 'Next shift starts in', cdStarted: 'Shift started', cdExit: 'Time until you leave', cdExitDone: 'Time to leave'
+    cdStart: 'Your shift starts in', cdNext: 'Next shift starts in', cdStarted: 'Shift started', cdExit: 'Time until you leave', cdExitDone: 'Time to leave',
+    enablePush: 'Enable notifications', pushActive: 'Automatic notifications are on ✓ even when the app is closed', testPush: 'Test notification', stopPush: 'Turn off',
+    pushOn: 'Notifications enabled', pushFail: 'Could not enable notifications, try again', testSent: 'Test notification sent', installFirst: 'On iPhone: add the app to your Home Screen from the Share button, open it from the icon, then enable notifications.'
   }
 };

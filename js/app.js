@@ -2,6 +2,8 @@
 'use strict';
 
 const KEY = 'mewshift.v1';
+/* رابط منبّه الإشعارات على Cloudflare (فارغ = غير مفعّل بعد) */
+const PUSH_API = '';
 const DEFAULT = {
   settings: {
     group: null, grade: 45, annualBase: null, annualBaseDate: null,
@@ -25,7 +27,7 @@ function load() {
     if (raw && typeof raw === 'object') {
       return {
         settings: Object.assign({}, DEFAULT.settings, raw.settings, { notify: Object.assign({}, DEFAULT.settings.notify, raw.settings && raw.settings.notify) }),
-        days: raw.days || {}, perms: raw.perms || [], leaves: raw.leaves || []
+        days: raw.days || {}, perms: raw.perms || [], leaves: raw.leaves || [], push: raw.push || null
       };
     }
   } catch (e) { /* تجاهل */ }
@@ -43,6 +45,7 @@ function readCookie() {
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* التخزين غير متاح */ }
+  if (S.push) { clearTimeout(save._t); save._t = setTimeout(syncPush, 1500); }
   try { document.cookie = 'mewshift=' + encodeURIComponent(JSON.stringify(S.settings)) + '; max-age=31536000; path=/; SameSite=Lax'; } catch (e) { /* */ }
 }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -402,9 +405,13 @@ function renderSettings() {
       ${[['att', 'notifyAtt'], ['exit', 'notifyExit'], ['balance', 'notifyBalance']].map(([k, l]) => `
         <div class="row-between toggle-row"><span>${t(l)}</span>
           <button type="button" role="switch" aria-checked="${s.notify[k]}" aria-label="${t(l)}" class="switch${s.notify[k] ? ' on' : ''}" data-act="toggleNotify" data-v="${k}"><i></i></button></div>`).join('')}
-      ${notifState === 'default' ? `<button type="button" class="btn primary" data-act="askNotify">${t('allowNotify')}</button>` : ''}
+      ${pushSupported() ? (S.push && notifState === 'granted'
+        ? `<div class="pill ok">${t('pushActive')}</div><div class="grid2"><button type="button" class="btn" data-act="testPush">${t('testPush')}</button><button type="button" class="btn" data-act="disablePush">${t('stopPush')}</button></div>`
+        : notifState === 'denied' ? `<span class="muted sm">${t('notifyDenied')}</span>`
+        : `<button type="button" class="btn primary" data-act="enablePush">${t('enablePush')}</button>${!isStandalone() ? `<span class="muted sm">${t('installFirst')}</span>` : ''}`)
+      : `${notifState === 'default' ? `<button type="button" class="btn primary" data-act="askNotify">${t('allowNotify')}</button>` : ''}
       ${notifState === 'denied' ? `<span class="muted sm">${t('notifyDenied')}</span>` : ''}
-      <span class="muted sm">${t('notifyNote')}</span>
+      <span class="muted sm">${t('notifyNote')}</span>`}
     </section>
     <section class="card row-between"><b>${t('language')}</b><div class="seg small">${segBtns('lang', [['ar', 'العربية'], ['en', 'English']], s.lang)}</div></section>
     <section class="card pro stack">
@@ -416,7 +423,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v0.5</p>`;
+    <p class="muted sm center">MEW Shift · v0.6</p>`;
 }
 
 /* ---------- النوافذ (Sheets) ---------- */
@@ -496,6 +503,9 @@ document.addEventListener('click', ev => {
     case 'theme': S.settings.theme = v; save(); render(); break;
     case 'lang': S.settings.lang = v; save(); render(); break;
     case 'toggleNotify': S.settings.notify[v] = !S.settings.notify[v]; save(); render(); break;
+    case 'enablePush': enablePush(); break;
+    case 'disablePush': disablePush(); break;
+    case 'testPush': testPush(); break;
     case 'askNotify': if ('Notification' in window) Notification.requestPermission().then(render); break;
     case 'delPerm': { const p = S.perms.find(x => x.id === v); S.perms = S.perms.filter(x => x.id !== v); save(); render(); if (p) daySheet(p.date); break; }
     case 'delLeave': { const l = S.leaves.find(x => x.id === v); S.leaves = S.leaves.filter(x => x.id !== v); save(); render(); if (l) daySheet(l.from); break; }
@@ -568,6 +578,52 @@ function doPunch(kind) {
   } else toast(t('outDone'));
 }
 
+/* ---------- إشعارات الخادم (تصل والتطبيق مغلق) ---------- */
+function pushSupported() { return !!PUSH_API && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function isStandalone() { return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
+function b64uToBytes(str) { const s = str.replace(/-/g, '+').replace(/_/g, '/'); const bin = atob(s + '==='.slice((s.length + 3) % 4)); return Uint8Array.from(bin, c => c.charCodeAt(0)); }
+async function enablePush() {
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast(t('notifyDenied'), true); render(); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const { publicKey } = await (await fetch(PUSH_API + '/vapid')).json();
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(publicKey) });
+    S.push = { endpoint: sub.endpoint }; save();
+    await syncPush(); toast(t('pushOn')); render();
+  } catch (e) { toast(t('pushFail'), true); }
+}
+async function disablePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    if (sub) { await fetch(PUSH_API + '/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) }); await sub.unsubscribe(); }
+  } catch (e) { /* */ }
+  S.push = null; save(); render();
+}
+async function testPush() {
+  try {
+    const r = await (await fetch(PUSH_API + '/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: S.push.endpoint }) })).json();
+    toast(r.ok ? t('testSent') : t('pushFail'), !r.ok);
+  } catch (e) { toast(t('pushFail'), true); }
+}
+async function syncPush() {
+  if (!S.push || !pushSupported() || !group()) return;
+  try {
+    const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    if (!sub) { S.push = null; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* */ } return; }
+    const td = todayISO(), end = addDays(td, 120), skip = [];
+    S.leaves.forEach(l => { for (let d = l.from; d <= l.to && d <= end; d = addDays(d, 1)) if (d >= addDays(td, -1)) skip.push(d); });
+    const date = activeDate(), sh = shiftOf(group(), date), dd = S.days[date] || {};
+    let exitAt = null;
+    if (isWorkShift(sh) && dd.in && !dd.out) { const e = evalEntry(sh, dd.in); const at = tsOf(date, e.exit); if (at > Date.now()) exitAt = new Date(at).toISOString().slice(0, 16); }
+    await fetch(PUSH_API + '/sync', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON(), group: group(), lang: S.settings.lang, att: S.settings.notify.att, exit: S.settings.notify.exit, skip, exitAt })
+    });
+  } catch (e) { /* يعاد المحاولة عند الحفظ القادم */ }
+}
+
 /* ---------- التنبيهات أثناء فتح التطبيق ---------- */
 function notify(msg) {
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification('MEW Shift', { body: msg, icon: 'icons/icon-192.png' }); } catch (e) { /* */ }
@@ -579,12 +635,12 @@ function tick() {
   const nr = nowRel(date), win = attWindow(sh);
   const k1 = date + 'att';
   if (S.settings.notify.att && !d.att && !notified.has(k1) && nr >= win.from && nr <= win.to) {
-    notified.add(k1); notify(t('attNow')); toast(t('attNow'), true);
+    notified.add(k1); if (!S.push) notify(t('attNow')); toast(t('attNow'), true);
   }
   if (S.settings.notify.exit && d.in && !d.out) {
     const e = evalEntry(sh, d.in), k2 = date + 'exit';
     const exitRel = e.exit; // منسوب لبداية يوم الشفت
-    if (!notified.has(k2) && nr >= exitRel && nr <= exitRel + 30) { notified.add(k2); notify(t('exitNow')); toast(t('exitNow'), true); }
+    if (!notified.has(k2) && nr >= exitRel && nr <= exitRel + 30) { notified.add(k2); if (!S.push) notify(t('exitNow')); toast(t('exitNow'), true); }
   }
 }
 
@@ -622,6 +678,7 @@ const ICONS = {
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if (S.settings.group) save();
 render();
+if (S.push) syncPush();
 setInterval(() => { tick(); }, 30000);
 setInterval(updateCountdowns, 1000);
 tick();
