@@ -232,9 +232,10 @@ function renderToday() {
     main += `
       <section class="shift-card s-${sh}${hol ? ' has-hol' : ''}">
         <div class="row-between"><span class="label">${date !== todayISO() ? t('yesterdayShift') : t('todayShift')}</span>${hol ? `<span class="hol-tag">${esc(hol[S.settings.lang] || hol.ar)}</span>` : ''}</div>
-        <div class="shift-name">${shiftName(sh)}</div>
-        <div class="shift-hours">${shiftHours(sh)}</div>
-        ${!d.in ? countdownBox(tsOf(date, RULES.shifts[sh].start), 'start') : !d.out ? countdownBox(tsOf(date, e.exit), 'exit') : ''}
+        <div class="shift-head">
+          <div class="stack sm-gap"><div class="shift-name">${shiftName(sh)}</div><div class="shift-hours">${shiftHours(sh)}</div></div>
+          ${d.out ? '' : shiftRing(tsOf(date, RULES.shifts[sh].start), tsOf(date, e ? e.exit : RULES.shifts[sh].end))}
+        </div>
         ${status}
       </section>
       <div class="grid3">
@@ -291,6 +292,31 @@ function renderToday() {
   return `${decor}<header class="top${decor ? ' with-decor season-' + season : ''}"><div>${kicker}<div class="muted">${dateLine}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header><div class="cols"><div class="col">${annBanner()}${banner}${primaryCol}</div><div class="col">${main}</div></div>`;
 }
 
+/* ---------- دائرة الشفت: قبل البداية تعدّ تنازلياً، وأثناء الدوام تمتلئ حتى وقت الخروج ---------- */
+const RING_R = 42, RING_C = 2 * Math.PI * RING_R;
+function shiftRing(start, end) {
+  return `<div class="shift-ring" data-start="${start}" data-end="${end}" role="timer">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="${RING_R}" class="sr-track"/><circle cx="50" cy="50" r="${RING_R}" class="sr-fill" stroke-dasharray="0 ${RING_C.toFixed(1)}" transform="rotate(-90 50 50)"/></svg>
+    <div class="sr-center"><small class="sr-label"></small><b class="sr-time" dir="ltr"></b></div></div>`;
+}
+function updateShiftRings() {
+  const now = Date.now();
+  document.querySelectorAll('.shift-ring').forEach(el => {
+    const start = Number(el.dataset.start), end = Number(el.dataset.end);
+    let label, ms, prog;
+    /* الحلقة تمثل الوقت المتبقي دائماً: تنقص حتى بداية الدوام، ثم تمتلئ من جديد وتنقص حتى وقت الخروج */
+    if (now < start) { label = t('ringStartsIn'); ms = start - now; prog = Math.min(1, ms / (8 * 3600e3)); }
+    else if (now < end) { label = t('ringLeft'); ms = end - now; prog = ms / (end - start); }
+    else { label = t('ringDone'); ms = 0; prog = 0; }
+    const sec = Math.floor(ms / 1000), h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s2 = sec % 60;
+    const txt = ms ? (h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s2).padStart(2, '0')}`) : '✓';
+    el.querySelector('.sr-label').textContent = label;
+    el.querySelector('.sr-time').textContent = txt;
+    el.querySelector('.sr-fill').setAttribute('stroke-dasharray', `${(RING_C * prog).toFixed(1)} ${RING_C.toFixed(1)}`);
+    el.setAttribute('aria-label', `${label} ${txt}`);
+  });
+}
+
 /* ---------- العد التنازلي ---------- */
 function tsOf(date, minutes) { const [y, m, dd] = date.split('-').map(Number); return new Date(y, m - 1, dd).getTime() + minutes * 60000; }
 function countdownBox(target, mode) {
@@ -303,6 +329,7 @@ function fmtCount(ms) {
   return days ? `${days}d ${hms}` : hms;
 }
 function updateCountdowns() {
+  updateShiftRings();
   const lockedBtn = document.querySelector('.punch.locked[data-opens]');
   if (lockedBtn && Date.now() >= Number(lockedBtn.dataset.opens) && !document.querySelector('#sheet:not([hidden])')) { render(); return; }
   document.querySelectorAll('.countdown').forEach(el => {

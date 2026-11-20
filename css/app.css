@@ -307,3 +307,15 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
 .ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2}
 .ring-center b{font-size:21px;font-weight:700}
 .ring-center small{font-size:12px;color:var(--muted)}
+
+/* دائرة الشفت */
+.shift-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.shift-ring{position:relative;width:124px;height:124px;flex:none}
+.shift-ring svg{width:124px;height:124px;stroke:none}
+.sr-track{fill:none;stroke:currentColor;stroke-opacity:.18;stroke-width:8}
+.sr-fill{fill:none;stroke:currentColor;stroke-width:8;stroke-linecap:round;transition:stroke-dasharray .4s}
+.sr-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+.sr-label{font-size:12px;font-weight:600;opacity:.85}
+.sr-time{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px}
+[data-season="ramadan"] .s-N .sr-fill,[data-season="ramadan"] .s-M .sr-fill{stroke:currentColor}
+@media (min-width:900px){.shift-ring,.shift-ring svg{width:140px;height:140px}.sr-time{font-size:22px}}
