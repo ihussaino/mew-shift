@@ -326,10 +326,21 @@ function punchBtn(kind, val, label, sub, primary, opensAt) {
   const lock = locked ? ` disabled aria-disabled="true" data-opens="${opensAt}" title="${t('opensAt')} ${esc(sub || '')}"` : '';
   return `<button type="button" class="${cls} k-${kind}" data-act="punch" data-v="${kind}"${lock}>${icon}<b>${label}</b><span>${done ? fmtHM(val) : locked ? t('opensAt') + ' ' + esc((sub || '').split(' – ')[0]) : esc(sub || '')}</span></button>`;
 }
+/* بطاقة رصيد بحلقة دائرية: الحلقة تمثل المتبقي من الرصيد */
 function balanceCard(title, big, small, ratio, foot, tone) {
   const pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
-  return `<section class="card bal"><span class="muted">${title}</span><div class="big">${big} <small>${small}</small></div>
-    <div class="bar"><i class="${tone}" style="width:${pct}%"></i></div><span class="muted sm">${foot}</span></section>`;
+  const r = 40, c = 2 * Math.PI * r, dash = (c * pct / 100).toFixed(1);
+  const color = pct === 0 ? 'var(--danger)' : tone === 'warn' ? 'var(--warn)' : 'var(--primary)';
+  return `<section class="card bal ring-bal">
+    <span class="muted">${title}</span>
+    <div class="ring-wrap">
+      <svg viewBox="0 0 100 100" role="img" aria-label="${title}: ${big} ${small}">
+        <circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--line)" stroke-width="9"/>
+        <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${dash} ${c.toFixed(1)}" transform="rotate(-90 50 50)"/>
+      </svg>
+      <div class="ring-center"><b>${big}</b><small>${small}</small></div>
+    </div>
+    <span class="muted sm center">${foot}</span></section>`;
 }
 function nextWork(date) {
   for (let i = 1; i <= 6; i++) { const d = addDays(date, i), s = shiftOf(group(), d); if (isWorkShift(s)) return { d, s }; }
@@ -479,7 +490,7 @@ function renderSettings() {
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
     </div>
-    <p class="muted sm center">MEW Shift · v1.8</p>`;
+    <p class="muted sm center">MEW Shift · v1.9</p>`;
 }
 
 function renderAbout() {
