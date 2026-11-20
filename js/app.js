@@ -173,14 +173,14 @@ function render() {
   document.documentElement.lang = S.settings.lang;
   document.documentElement.dir = S.settings.lang === 'ar' ? 'rtl' : 'ltr';
   document.title = 'MEW Shift';
-  const html = view === 'today' ? renderToday() : view === 'calendar' ? renderCalendar() : view === 'records' ? renderRecords() : renderSettings();
+  const html = view === 'today' ? renderToday() : view === 'calendar' ? renderCalendar() : view === 'records' ? renderRecords() : view === 'about' ? renderAbout() : renderSettings();
   $app().innerHTML = html;
   renderNav();
   updateCountdowns();
 }
 
 function renderNav() {
-  const items = [['today', 'navToday', ICONS.home], ['calendar', 'navCalendar', ICONS.cal], ['records', 'navRecords', ICONS.chart], ['settings', 'navSettings', ICONS.gear]];
+  const items = [['today', 'navToday', ICONS.home], ['calendar', 'navCalendar', ICONS.cal], ['records', 'navRecords', ICONS.chart], ['settings', 'navSettings', ICONS.gear], ['about', 'navAbout', ICONS.info]];
   document.getElementById('nav').innerHTML = items.map(([k, l, ic]) =>
     `<button type="button" class="nav-btn${view === k ? ' on' : ''}" data-act="nav" data-v="${k}" aria-current="${view === k ? 'page' : 'false'}">${ic}<span>${t(l)}</span></button>`).join('');
 }
@@ -423,7 +423,21 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v0.9</p>`;
+    <p class="muted sm center">MEW Shift · v1.0</p>`;
+}
+
+function renderAbout() {
+  return `
+    <section class="card about">
+      <h1 class="about-title">About</h1>
+      <img class="about-logo logo-light" src="img/ihussain-black.png" alt="iHussain" width="260" height="250">
+      <img class="about-logo logo-dark" src="img/ihussain-white.png" alt="iHussain" width="260" height="250">
+      <p class="about-text">${t('aboutText')}</p>
+      <hr>
+      <a class="about-mail" href="mailto:iHussain@Engineer.com" dir="ltr">iHussain@Engineer.com</a>
+      <hr>
+      <p class="about-copy">${t('aboutCopy')}</p>
+    </section>`;
 }
 
 /* ---------- النوافذ (Sheets) ---------- */
@@ -671,7 +685,8 @@ const ICONS = {
   out: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 16l-4-4 4-4M6 12h10"/></svg>',
   bell: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
-  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>'
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'
 };
 
 /* ---------- البدء ---------- */

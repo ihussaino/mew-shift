@@ -131,7 +131,7 @@ svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .danger-t{color:var(--danger)}
 
 /* الشريط السفلي */
-#nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:6px 8px calc(8px + env(safe-area-inset-bottom));z-index:5}
+#nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:6px 8px calc(8px + env(safe-area-inset-bottom));z-index:5}
 .nav-btn{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:12px;color:var(--muted);cursor:pointer;min-height:52px}
 .nav-btn.on{color:var(--primary);font-weight:700}
 [data-theme="dark"] .nav-btn.on{color:#8DB2F0}
@@ -163,3 +163,16 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
 .cd-time{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.5px}
 .countdown.over .cd-time{font-size:18px}
 .leave-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* About */
+.about{display:flex;flex-direction:column;align-items:center;text-align:center;gap:22px;padding:32px 24px;border:1px solid var(--line)}
+.about-title{font-size:30px;font-weight:700;color:var(--ink)}
+.about-logo{width:200px;height:auto}
+.logo-dark{display:none}
+[data-theme="dark"] .logo-light{display:none}
+[data-theme="dark"] .logo-dark{display:block}
+.about-text{font-size:16px;line-height:1.9;color:var(--ink)}
+.about hr{width:100%;border:0;border-top:1px solid var(--line);margin:0}
+.about-mail{font-size:19px;color:#2E7D98;text-decoration:none}
+[data-theme="dark"] .about-mail{color:#6FC3DF}
+.about-copy{font-size:13px;color:var(--muted)}
