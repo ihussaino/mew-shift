@@ -29,9 +29,22 @@ function load() {
       };
     }
   } catch (e) { /* تجاهل */ }
-  return JSON.parse(JSON.stringify(DEFAULT));
+  const fresh = JSON.parse(JSON.stringify(DEFAULT));
+  const backup = readCookie();
+  if (backup) Object.assign(fresh.settings, backup, { notify: Object.assign({}, fresh.settings.notify, backup.notify) });
+  return fresh;
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* التخزين غير متاح */ } }
+/* نسخة احتياطية صغيرة من الإعدادات (المجموعة وغيرها) في كوكي لمدة سنة */
+function readCookie() {
+  try {
+    const m = document.cookie.match(/(?:^|; )mewshift=([^;]*)/);
+    return m ? JSON.parse(decodeURIComponent(m[1])) : null;
+  } catch (e) { return null; }
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* التخزين غير متاح */ }
+  try { document.cookie = 'mewshift=' + encodeURIComponent(JSON.stringify(S.settings)) + '; max-age=31536000; path=/; SameSite=Lax'; } catch (e) { /* */ }
+}
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 /* ---------- اللغة والتنسيق ---------- */
@@ -561,6 +574,8 @@ const ICONS = {
 };
 
 /* ---------- البدء ---------- */
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+if (S.settings.group) save();
 render();
 setInterval(() => { tick(); }, 30000);
 tick();
