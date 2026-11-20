@@ -238,7 +238,7 @@ function renderToday() {
       </section>
       <div class="grid3">
         ${punchBtn('in', d.in, t('btnIn'), e ? '' : fmt12(RULES.shifts[sh].start))}
-        ${punchBtn('att', d.att, t('btnAtt'), d.attMissed ? t('forgot') : `${fmtPlain(win.from)} – ${fmtPlain(win.to)}`, !d.att && !d.attMissed && d.in)}
+        ${punchBtn('att', d.att, t('btnAtt'), d.attMissed ? t('forgot') : `${fmtPlain(win.from)} – ${fmtPlain(win.to)}`, !d.att && !d.attMissed && d.in, !d.att && !d.attMissed && nr < win.from ? tsOf(date, win.from) : 0)}
         ${punchBtn('out', d.out, t('btnOut'), e ? fmt12(e.exit) : '')}
       </div>
       <div class="grid2">
@@ -302,6 +302,8 @@ function fmtCount(ms) {
   return days ? `${days}d ${hms}` : hms;
 }
 function updateCountdowns() {
+  const lockedBtn = document.querySelector('.punch.locked[data-opens]');
+  if (lockedBtn && Date.now() >= Number(lockedBtn.dataset.opens) && !document.querySelector('#sheet:not([hidden])')) { render(); return; }
   document.querySelectorAll('.countdown').forEach(el => {
     const diff = Number(el.dataset.target) - Date.now(), mode = el.dataset.mode;
     const label = el.querySelector('.cd-label'), time = el.querySelector('.cd-time');
@@ -314,11 +316,14 @@ function updateCountdowns() {
   });
 }
 
-function punchBtn(kind, val, label, sub, primary) {
+/* opensAt: وقت فتح الزر (للتواجد قبل نافذته) — قبله يكون شفافاً ومعطلاً ويتفعّل وحده عند الوقت */
+function punchBtn(kind, val, label, sub, primary, opensAt) {
   const done = !!val;
-  const cls = done ? 'punch done' : primary ? 'punch primary' : 'punch';
+  const locked = !done && opensAt > Date.now();
+  const cls = done ? 'punch done' : locked ? 'punch locked' : primary ? 'punch primary' : 'punch';
   const icon = done ? ICONS.check : kind === 'att' ? ICONS.clock : kind === 'out' ? ICONS.out : ICONS.in;
-  return `<button type="button" class="${cls} k-${kind}" data-act="punch" data-v="${kind}">${icon}<b>${label}</b><span>${done ? fmtHM(val) : esc(sub || '')}</span></button>`;
+  const lock = locked ? ` disabled aria-disabled="true" data-opens="${opensAt}" title="${t('opensAt')} ${esc(sub || '')}"` : '';
+  return `<button type="button" class="${cls} k-${kind}" data-act="punch" data-v="${kind}"${lock}>${icon}<b>${label}</b><span>${done ? fmtHM(val) : locked ? t('opensAt') + ' ' + esc((sub || '').split(' – ')[0]) : esc(sub || '')}</span></button>`;
 }
 function balanceCard(title, big, small, ratio, foot, tone) {
   const pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
@@ -471,7 +476,7 @@ function renderSettings() {
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
     </div>
-    <p class="muted sm center">MEW Shift · v1.6</p>`;
+    <p class="muted sm center">MEW Shift · v1.7</p>`;
 }
 
 function renderAbout() {
