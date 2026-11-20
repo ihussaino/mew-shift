@@ -6,7 +6,7 @@ const KEY = 'mewshift.v1';
 const PUSH_API = 'https://mew-shift-push.ihussain-u14.workers.dev';
 const DEFAULT = {
   settings: {
-    group: null, grade: 45, annualBase: null, annualBaseDate: null,
+    group: null, name: '', grade: 45, annualBase: null, annualBaseDate: null,
     lang: 'ar', themeMode: 'auto', theme: 'light',
     notify: { att: true, exit: true, balance: true }
   },
@@ -173,6 +173,9 @@ function render() {
   document.documentElement.lang = S.settings.lang;
   document.documentElement.dir = S.settings.lang === 'ar' ? 'rtl' : 'ltr';
   document.title = 'MEW Shift';
+  const onboarding = !group() || !S.settings.name;
+  if (onboarding) view = 'today';
+  document.getElementById('nav').hidden = onboarding;
   const html = view === 'today' ? renderToday() : view === 'calendar' ? renderCalendar() : view === 'records' ? renderRecords() : view === 'about' ? renderAbout() : renderSettings();
   $app().innerHTML = html;
   renderNav();
@@ -189,11 +192,28 @@ function groupChip() {
   return `<button type="button" class="chip-primary" data-act="nav" data-v="settings">${t('group')} ${esc(group() || '?')}</button>`;
 }
 
-function renderToday() {
-  if (!group()) return `
+/* أول دخول: الاسم والمجموعة */
+let obName = null, obGroup = null;
+function renderOnboarding() {
+  if (obName == null) obName = S.settings.name || '';
+  if (obGroup == null) obGroup = S.settings.group;
+  const ready = obName.trim() && obGroup;
+  return `
     <header class="top"><div><div class="muted">${fmtDate(todayISO())}</div><h1>MEW Shift</h1></div></header>
-    <section class="card stack"><h2>${t('welcome')}</h2><p class="muted">${t('chooseGroupFirst')}</p>
-    <div class="grid5">${['A', 'B', 'C', 'D', 'E'].map(g => `<button type="button" class="seg-big" data-act="setGroup" data-v="${g}">${g}</button>`).join('')}</div></section>`;
+    <section class="card stack onboard">
+      <h2>${t('welcome')}</h2>
+      <p class="muted">${t('onboardIntro')}</p>
+      <label class="stack sm-gap"><b>${t('yourName')}</b>
+        <input type="text" class="text-in" data-act="obName" value="${esc(obName)}" maxlength="30" autocomplete="given-name" placeholder="${t('namePlaceholder')}"></label>
+      <div class="stack sm-gap"><b>${t('yourGroup')}</b><span class="muted sm">${t('station')}</span>
+        <div class="grid5">${['A', 'B', 'C', 'D', 'E'].map(g => `<button type="button" class="seg-big${obGroup === g ? ' on' : ''}" data-act="obGroup" data-v="${g}" aria-pressed="${obGroup === g}">${g}</button>`).join('')}</div></div>
+      <button type="button" class="btn primary" data-act="obDone"${ready ? '' : ' disabled'}>${t('start')}</button>
+      <span class="muted sm">${t('onboardNote')}</span>
+    </section>`;
+}
+
+function renderToday() {
+  if (!group() || !S.settings.name) return renderOnboarding();
 
   const date = activeDate(), sh = shiftOf(group(), date), d = S.days[date] || {}, hol = holidayOn(date), lv = leaveOn(date);
   const ym = todayISO().slice(0, 7), u = monthUsage(ym);
@@ -254,7 +274,7 @@ function renderToday() {
       return `<button type="button" class="mini s-${s}${h ? ' has-hol' : ''}" data-act="openDay" data-v="${dd}"><span>${dayName(dd)}</span><b>${shiftName(s)}</b></button>`;
     }).join('')}</div></section>`;
 
-  return `<header class="top"><div><div class="muted">${fmtDate(todayISO())}</div><h1>MEW Shift</h1></div>${groupChip()}</header>${main}`;
+  return `<header class="top"><div><div class="muted">${fmtDate(todayISO())}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header>${main}`;
 }
 
 /* ---------- العد التنازلي ---------- */
@@ -385,6 +405,8 @@ function renderSettings() {
   return `
     <header class="top"><h1>${t('navSettings')}</h1></header>
     <section class="card stack">
+      <label class="stack sm-gap"><b>${t('yourName')}</b>
+        <input type="text" class="text-in" data-act="setName" value="${esc(s.name || '')}" maxlength="30" autocomplete="given-name"></label>
       <b>${t('myGroup')}</b><span class="muted sm">${t('station')}</span>
       <div class="grid5">${['A', 'B', 'C', 'D', 'E'].map(g => `<button type="button" class="seg-big${s.group === g ? ' on' : ''}" data-act="setGroup" data-v="${g}">${g}</button>`).join('')}</div>
     </section>
@@ -423,7 +445,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v1.1</p>`;
+    <p class="muted sm center">MEW Shift · v1.2</p>`;
 }
 
 function renderAbout() {
@@ -506,6 +528,12 @@ document.addEventListener('click', ev => {
   switch (act) {
     case 'nav': view = v; closeSheet(); render(); window.scrollTo(0, 0); break;
     case 'setGroup': S.settings.group = v; save(); render(); break;
+    case 'obGroup': obGroup = v; render(); break;
+    case 'obDone': {
+      const n = (obName || '').trim().slice(0, 30);
+      if (!n || !obGroup) break;
+      S.settings.name = n; S.settings.group = obGroup; save(); render(); toast(`${t('hello')} ${n}`); break;
+    }
     case 'punch': doPunch(v); break;
     case 'editDay': case 'openDay': daySheet(v); break;
     case 'forgotAtt': mutate(v, () => { S.days[v] = Object.assign({}, S.days[v], { attMissed: true }); }); sourceSheet(v, 'att', RULES.attPenalty); break;
@@ -532,8 +560,22 @@ document.addEventListener('click', ev => {
   }
 });
 
+document.addEventListener('input', ev => {
+  const el = ev.target;
+  if (el.dataset && el.dataset.act === 'obName') {
+    obName = el.value;
+    const btn = document.querySelector('[data-act="obDone"]');
+    if (btn) btn.disabled = !(obName.trim() && obGroup);
+  }
+});
+
 document.addEventListener('change', ev => {
   const el = ev.target;
+  if (el.dataset && el.dataset.act === 'setName') {
+    const n = el.value.trim().slice(0, 30);
+    if (n) { S.settings.name = n; save(); toast(t('saved')); } else { el.value = S.settings.name; }
+    return;
+  }
   if (el.dataset && el.dataset.act === 'annualBase') {
     const n = el.value === '' ? null : Math.max(0, Math.min(180, Number(el.value)));
     S.settings.annualBase = n; S.settings.annualBaseDate = n == null ? null : todayISO(); save(); render();
