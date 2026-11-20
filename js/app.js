@@ -585,12 +585,32 @@ function renderAbout() {
 }
 
 /* ---------- النوافذ (Sheets) ---------- */
+/* النافذة السفلية: تطلع من تحت لفوق، وفيها زر إغلاق بالأعلى.
+   إذا كانت مفتوحة أصلاً نحدّث محتواها فقط بدون إعادة الحركة. */
+let sheetTimer;
 function openSheet(html) {
   const el = document.getElementById('sheet');
-  el.innerHTML = `<div class="sheet-backdrop" data-act="closeSheet"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
+  clearTimeout(sheetTimer);
+  const open = !el.hidden && el.querySelector('.sheet') && !el.classList.contains('closing');
+  if (open) {
+    const body = el.querySelector('.sheet-body'), top = body.scrollTop;
+    body.innerHTML = html; body.scrollTop = top; return;
+  }
+  el.classList.remove('closing');
+  el.innerHTML = `<div class="sheet-backdrop" data-act="closeSheet"></div>
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet-top"><div class="grab"></div><button type="button" class="sheet-close" data-act="closeSheet" aria-label="${t('close')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="sheet-body">${html}</div></div>`;
   el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('open'));
 }
-function closeSheet() { const el = document.getElementById('sheet'); el.hidden = true; el.innerHTML = ''; }
+function closeSheet() {
+  const el = document.getElementById('sheet');
+  if (el.hidden) return;
+  el.classList.remove('open'); el.classList.add('closing');
+  sheetTimer = setTimeout(() => { el.hidden = true; el.innerHTML = ''; el.classList.remove('closing'); }, 280);
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
 function srcSelect(name, cur) {
   return `<select name="${name}" class="sel"><option value="late"${cur !== 'perm' ? ' selected' : ''}>${t('from_late')}</option><option value="perm"${cur === 'perm' ? ' selected' : ''}>${t('from_perm')}</option></select>`;

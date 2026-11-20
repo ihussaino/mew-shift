@@ -360,3 +360,21 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
 @keyframes splash-in{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes splash-up{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion: reduce){#splash img,#splash b,#splash span{animation:none}}
+
+/* حركة النافذة السفلية وزر الإغلاق */
+.sheet{padding-top:0;gap:0}
+.sheet-top{position:sticky;top:0;z-index:2;background:var(--bg);display:flex;align-items:flex-start;justify-content:center;min-height:60px;padding-top:10px;box-sizing:border-box;margin:0 -18px;border-bottom:1px solid var(--line)}
+.sheet-close{position:absolute;inset-inline-end:14px;top:12px;width:40px;height:40px;border-radius:50%;border:0;background:var(--chip);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.sheet-close svg{width:20px;height:20px;stroke-width:2.2}
+.sheet-body{display:flex;flex-direction:column;gap:16px;padding-top:14px}
+.sheet-backdrop{opacity:0;transition:opacity .28s ease}
+.sheet{transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.9,.3,1)}
+#sheet.open .sheet-backdrop{opacity:1}
+#sheet.open .sheet{transform:none}
+#sheet.closing .sheet{transition-duration:.25s;transition-timing-function:ease-in}
+@media (min-width:900px){
+  .sheet{transform:translate(-50%,-46%) scale(.96);opacity:0;transition:transform .28s ease,opacity .28s ease}
+  #sheet.open .sheet{transform:translate(-50%,-50%);opacity:1}
+  .grab{display:none}
+}
+@media (prefers-reduced-motion: reduce){.sheet,.sheet-backdrop{transition:none}}
