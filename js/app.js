@@ -471,7 +471,7 @@ function renderSettings() {
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
     </div>
-    <p class="muted sm center">MEW Shift · v1.5</p>`;
+    <p class="muted sm center">MEW Shift · v1.6</p>`;
 }
 
 function renderAbout() {

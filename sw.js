@@ -1,6 +1,6 @@
 /* يحفظ ملفات التطبيق ليعمل بدون إنترنت. غيّر الرقم عند كل تحديث. */
-const CACHE = 'mewshift-v15';
-const FILES = ['./', 'index.html', 'css/app.css?v=15', 'js/i18n.js?v=15', 'js/rules.js?v=15', 'js/app.js?v=15', 'manifest.webmanifest?v=3', 'icons/icon-192.png?v=3', 'icons/icon-512.png?v=3', 'icons/apple-touch-icon.png?v=3', 'img/ihussain-black.png', 'img/ihussain-white.png'];
+const CACHE = 'mewshift-v16';
+const FILES = ['./', 'index.html', 'css/fonts.css?v=16', 'fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2', 'fonts/ibm-plex-sans-arabic-latin-400-normal.woff2', 'fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2', 'fonts/ibm-plex-sans-arabic-latin-500-normal.woff2', 'fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2', 'fonts/ibm-plex-sans-arabic-latin-600-normal.woff2', 'fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2', 'fonts/ibm-plex-sans-arabic-latin-700-normal.woff2', 'fonts/reem-kufi-arabic-500-normal.woff2', 'fonts/reem-kufi-latin-500-normal.woff2', 'fonts/reem-kufi-arabic-700-normal.woff2', 'fonts/reem-kufi-latin-700-normal.woff2', 'css/app.css?v=16', 'js/i18n.js?v=16', 'js/rules.js?v=16', 'js/app.js?v=16', 'manifest.webmanifest?v=3', 'icons/icon-192.png?v=3', 'icons/icon-512.png?v=3', 'icons/apple-touch-icon.png?v=3', 'img/ihussain-black.png', 'img/ihussain-white.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
