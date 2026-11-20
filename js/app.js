@@ -423,7 +423,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v0.7</p>`;
+    <p class="muted sm center">MEW Shift · v0.8</p>`;
 }
 
 /* ---------- النوافذ (Sheets) ---------- */
@@ -626,7 +626,7 @@ async function syncPush() {
 
 /* ---------- التنبيهات أثناء فتح التطبيق ---------- */
 function notify(msg) {
-  try { if ('Notification' in window && Notification.permission === 'granted') new Notification('MEW Shift', { body: msg, icon: 'icons/icon-192.png' }); } catch (e) { /* */ }
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification('MEW Shift', { body: msg, icon: 'icons/icon-192.png?v=2' }); } catch (e) { /* */ }
 }
 function tick() {
   if (!group()) return;
