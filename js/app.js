@@ -317,7 +317,10 @@ function nextWork(date) {
   return null;
 }
 
+let calGroup = null; // مجموعة معروضة مؤقتاً في الجدول (لا تغيّر الإعدادات)
 function renderCalendar() {
+  if (calGroup === group()) calGroup = null;
+  const g = calGroup || group(), mine = !calGroup;
   const [y, m] = calMonth.split('-').map(Number);
   const [first, last] = monthBounds(calMonth);
   const lead = weekday(first);
@@ -325,17 +328,20 @@ function renderCalendar() {
   for (let i = 0; i < lead; i++) cells += '<div></div>';
   let work = 0;
   for (let d = first; d <= last; d = addDays(d, 1)) {
-    const s = shiftOf(group(), d), h = holidayOn(d), lv = leaveOn(d);
+    const s = shiftOf(g, d), h = holidayOn(d), lv = mine ? leaveOn(d) : null;
     if (isWorkShift(s)) work++;
     const cls = ['cell', 's-' + (s || 'O')];
     if (h && !isWorkShift(s)) cls.push('hol-full'); else if (h) cls.push('has-hol');
     if (d === todayISO()) cls.push('today');
-    cells += `<button type="button" class="${cls.join(' ')}" data-act="openDay" data-v="${d}" aria-label="${fmtDate(d)} ${shiftName(s)}${h ? ' — ' + esc(h.ar) : ''}">
+    cells += `<button type="button" class="${cls.join(' ')}" data-act="${mine ? 'openDay' : 'peekDay'}" data-v="${d}" aria-label="${fmtDate(d)} ${shiftName(s)}${h ? ' — ' + esc(h.ar) : ''}">
       <span>${Number(d.slice(8))}</span>${lv ? `<i class="leave-dot" title="${t('leave_' + lv.type)}"></i>` : ''}</button>`;
   }
   const hols = HOLIDAYS.filter(h => h.from <= last && h.to >= first);
   return `
     <header class="top"><h1>${t('navCalendar')}</h1>${groupChip()}</header>
+    <div class="seg group-seg" role="group" aria-label="${t('viewGroup')}">${['A', 'B', 'C', 'D', 'E'].map(x =>
+      `<button type="button" class="${x === g ? 'on' : ''}" data-act="calGroup" data-v="${x}" aria-pressed="${x === g}">${x}${x === group() ? '<small>' + t('mine') + '</small>' : ''}</button>`).join('')}</div>
+    ${mine ? '' : `<div class="card info-row viewing"><span>${t('viewingGroup')} <b>${g}</b></span><button type="button" class="link" data-act="calGroup" data-v="${group()}">${t('backToMine')}</button></div>`}
     <div class="month-nav">
       <button type="button" class="icon-btn" data-act="month" data-v="-1" aria-label="${t('prevMonth')}">${S.settings.lang === 'ar' ? ICONS.right : ICONS.left}</button>
       <b>${monthName(m)} ${y}</b>
@@ -445,7 +451,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v1.2</p>`;
+    <p class="muted sm center">MEW Shift · v1.3</p>`;
 }
 
 function renderAbout() {
@@ -538,6 +544,8 @@ document.addEventListener('click', ev => {
     case 'editDay': case 'openDay': daySheet(v); break;
     case 'forgotAtt': mutate(v, () => { S.days[v] = Object.assign({}, S.days[v], { attMissed: true }); }); sourceSheet(v, 'att', RULES.attPenalty); break;
     case 'pickSrc': { const [date, which, src] = v.split('|'); mutate(date, () => { S.days[date] = Object.assign({}, S.days[date], which === 'in' ? { inSrc: src } : { attSrc: src }); }); closeSheet(); break; }
+    case 'calGroup': calGroup = v === group() ? null : v; render(); break;
+    case 'peekDay': { const s2 = shiftOf(calGroup, v); toast(`${t('group')} ${calGroup} · ${fmtDate(v)}: ${shiftName(s2)}${isWorkShift(s2) ? ' — ' + shiftHours(s2) : ''}`); break; }
     case 'month': { const [y, m] = calMonth.split('-').map(Number); const dt = new Date(Date.UTC(y, m - 1 + Number(v), 1)); calMonth = dt.toISOString().slice(0, 7); render(); break; }
     case 'range': recRange = v; render(); break;
     case 'grade': S.settings.grade = Number(v); save(); render(); break;
