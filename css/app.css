@@ -319,3 +319,44 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
 .sr-time{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px}
 [data-season="ramadan"] .s-N .sr-fill,[data-season="ramadan"] .s-M .sr-fill{stroke:currentColor}
 @media (min-width:900px){.shift-ring,.shift-ring svg{width:140px;height:140px}.sr-time{font-size:22px}}
+
+/* ---------- الترحيب ---------- */
+.onboard-flow{display:flex;flex-direction:column;gap:18px;min-height:calc(100vh - 120px)}
+.ob-progress{display:flex;flex-direction:column;gap:8px}
+.ob-bars{display:flex;gap:6px}
+.ob-bars span{flex:1;height:6px;border-radius:3px;background:var(--border)}
+.ob-bars span.on{background:var(--primary)}
+.ob-title h1{font-size:27px}
+.ob-title p{font-size:15.5px;line-height:1.7}
+.big-in{min-height:54px;font-size:18px;border-width:2px}
+.big-in:focus{border-color:var(--primary);outline:none}
+.privacy-note{display:flex;align-items:center;gap:10px;background:var(--ok-bg);color:var(--ok-ink);border-radius:14px;padding:12px 14px;font-size:13.5px;line-height:1.6}
+.privacy-note svg{color:var(--ok);width:22px;height:22px}
+.ob-next{margin-top:auto;min-height:54px;font-size:16px}
+.ob-next .btn{min-height:54px;font-size:16px}
+.ob-group{min-height:58px;font-size:20px}
+.ob-preview{display:flex;justify-content:space-between;background:var(--soft);border-radius:14px;padding:12px 14px;font-size:15px}
+.ob-bell{width:120px;height:120px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;margin:12px auto 0;color:var(--primary)}
+.ob-bell svg{width:58px;height:58px}
+.ob-list{display:flex;flex-direction:column}
+.ob-list .row-between{min-height:50px;border-top:1px solid var(--line)}
+.ob-list .row-between:first-child{border-top:0}
+.install-hint{position:fixed;inset:0;z-index:40;background:rgba(15,27,45,.45);display:flex;align-items:flex-end;justify-content:center;padding:14px 14px calc(96px + env(safe-area-inset-bottom))}
+.install-card{width:100%;max-width:480px;background:var(--card);color:var(--ink);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 40px rgba(0,0,0,.25)}
+.install-head{display:flex;align-items:center;gap:12px}
+.install-head img{border-radius:12px;border:1px solid var(--line);background:#FFFFFF}
+.install-steps{margin:0;padding-inline-start:22px;display:flex;flex-direction:column;gap:8px;font-size:14.5px}
+.install-steps svg{width:20px;height:20px;vertical-align:-4px;color:var(--primary)}
+.install-arrow{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:40px;height:60px;fill:none;stroke:#FFFFFF;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;z-index:41}
+
+/* الشاشة الافتتاحية */
+#splash{position:fixed;inset:0;z-index:60;background:#FFFFFF;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .4s ease}
+#splash img{width:140px;height:auto;animation:splash-in .7s cubic-bezier(.2,1.2,.4,1)}
+#splash b{font-size:28px;color:#0F1B2D;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;animation:splash-up .7s .15s both}
+#splash span{font-size:14px;color:#4A5568;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;animation:splash-up .7s .25s both}
+#splash .dots{display:flex;gap:6px;margin-top:12px}
+#splash .dots i{width:8px;height:8px;border-radius:50%}
+#splash.hide{opacity:0;pointer-events:none}
+@keyframes splash-in{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes splash-up{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){#splash img,#splash b,#splash span{animation:none}}

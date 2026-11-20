@@ -174,7 +174,8 @@ function render() {
   document.documentElement.lang = S.settings.lang;
   document.documentElement.dir = S.settings.lang === 'ar' ? 'rtl' : 'ltr';
   document.title = 'MEW Shift';
-  const onboarding = !group() || !S.settings.name;
+  if (!group() || !S.settings.name) obActive = true;
+  const onboarding = obActive;
   if (onboarding) view = 'today';
   document.getElementById('nav').hidden = onboarding;
   const html = view === 'today' ? renderToday() : view === 'calendar' ? renderCalendar() : view === 'records' ? renderRecords() : view === 'about' ? renderAbout() : renderSettings();
@@ -194,27 +195,76 @@ function groupChip() {
 }
 
 /* أول دخول: الاسم والمجموعة */
-let obName = null, obGroup = null;
+/* ---------- الترحيب: 4 خطوات (الاسم، المجموعة، الإجازات، التنبيهات) ---------- */
+let obName = null, obGroup = null, obStep = 1, obActive = false, obInstallDismissed = false;
+try { obInstallDismissed = sessionStorage.getItem('mewshift.installHint') === '1'; } catch (e) { /* */ }
+function isIOS() { return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function obProgress(step, skippable) {
+  return `<div class="ob-progress"><div class="row-between"><span class="muted sm">${t('stepOf').replace('{n}', step)}</span>${skippable ? `<button type="button" class="link" data-act="obSkip">${t('later')}</button>` : ''}</div>
+    <div class="ob-bars">${[1, 2, 3, 4].map(i => `<span class="${i <= step ? 'on' : ''}"></span>`).join('')}</div></div>`;
+}
+function installHint() {
+  if (obInstallDismissed || !isIOS() || isStandalone()) return '';
+  return `<div class="install-hint" role="dialog" aria-label="${t('installTitle')}"><div class="install-card">
+    <div class="install-head"><img src="icons/icon-192.png?v=3" alt="" width="52" height="52"><div class="stack sm-gap"><b>${t('installTitle')}</b><span class="muted sm">${t('installWhy')}</span></div></div>
+    <ol class="install-steps"><li>${t('installStep1')} ${ICONS.share}</li><li>${t('installStep2')}</li><li>${t('installStep3')}</li></ol>
+    <button type="button" class="link" data-act="obInstallLater">${t('continueBrowser')}</button></div>
+    <svg class="install-arrow" viewBox="0 0 40 60" aria-hidden="true"><path d="M20 4v44M8 36l12 14 12-14"/></svg></div>`;
+}
 function renderOnboarding() {
   if (obName == null) obName = S.settings.name || '';
   if (obGroup == null) obGroup = S.settings.group;
-  const ready = obName.trim() && obGroup;
-  return `
-    <header class="top"><div><div class="muted">${fmtDate(todayISO())}</div><h1>MEW Shift</h1></div></header>
-    <section class="card stack onboard">
-      <h2>${t('welcome')}</h2>
-      <p class="muted">${t('onboardIntro')}</p>
-      <label class="stack sm-gap"><b>${t('yourName')}</b>
-        <input type="text" class="text-in" data-act="obName" value="${esc(obName)}" maxlength="30" autocomplete="given-name" placeholder="${t('namePlaceholder')}"></label>
-      <div class="stack sm-gap"><b>${t('yourGroup')}</b><span class="muted sm">${t('station')}</span>
-        <div class="grid5">${['A', 'B', 'C', 'D', 'E'].map(g => `<button type="button" class="seg-big${obGroup === g ? ' on' : ''}" data-act="obGroup" data-v="${g}" aria-pressed="${obGroup === g}">${g}</button>`).join('')}</div></div>
-      <button type="button" class="btn primary" data-act="obDone"${ready ? '' : ' disabled'}>${t('start')}</button>
-      <span class="muted sm">${t('onboardNote')}</span>
-    </section>`;
+  let body = '';
+  if (obStep === 1) {
+    body = `${obProgress(1)}
+      <div class="stack sm-gap ob-title"><h1>${t('obHello')} 👋</h1><p class="muted">${t('obNameQ')}</p></div>
+      <label class="stack sm-gap"><b>${t('yourName')}</b><input type="text" class="text-in big-in" data-act="obName" value="${esc(obName)}" maxlength="30" autocomplete="given-name" placeholder="${t('namePlaceholder')}"></label>
+      <div class="privacy-note">${ICONS.lock}<span>${t('privacyNote')}</span></div>
+      <button type="button" class="btn primary ob-next" data-act="obNext"${obName.trim() ? '' : ' disabled'}>${t('next')}</button>`;
+  } else if (obStep === 2) {
+    const today = todayISO();
+    const preview = obGroup ? (() => { const sh = shiftOf(obGroup, today), tm = shiftOf(obGroup, addDays(today, 1)); return `<div class="ob-preview"><span>${t('today')}: <b>${shiftName(sh)}</b></span><span>${t('tomorrow')}: <b>${shiftName(tm)}</b></span></div>`; })() : '';
+    body = `${obProgress(2)}
+      <div class="stack sm-gap ob-title"><h1>${t('obGroupQ')}</h1><p class="muted">${t('obGroupHint')}</p></div>
+      <div class="grid5">${['A', 'B', 'C', 'D', 'E'].map(g => `<button type="button" class="seg-big ob-group${obGroup === g ? ' on' : ''}" data-act="obGroup" data-v="${g}" aria-pressed="${obGroup === g}">${g}</button>`).join('')}</div>
+      ${preview}
+      <span class="muted sm">${t('station')}</span>
+      <button type="button" class="btn primary ob-next" data-act="obNext"${obGroup ? '' : ' disabled'}>${t('next')}</button>`;
+  } else if (obStep === 3) {
+    const st = S.settings;
+    body = `${obProgress(3, true)}
+      <div class="stack sm-gap ob-title"><h1>${t('obLeaveQ')}</h1><p class="muted">${t('obLeaveHint')}</p></div>
+      <section class="card stack"><b>${t('gradeLabel')}</b><div class="seg">${[[35, '35 ' + t('day')], [45, '45 ' + t('day')]].map(([v, l]) => `<button type="button" class="${Number(st.grade) === v ? 'on' : ''}" data-act="grade" data-v="${v}">${l}</button>`).join('')}</div></section>
+      <section class="card stack"><label class="row-between"><b>${t('currentBalance')}</b><input type="number" inputmode="numeric" min="0" max="180" class="num" data-act="annualBase" value="${st.annualBase == null ? '' : esc(st.annualBase)}" placeholder="0"></label><span class="muted sm">${t('obBalanceWhere')}</span></section>
+      <button type="button" class="btn primary ob-next" data-act="obNext">${t('next')}</button>`;
+  } else {
+    const canPush = pushSupported() && (!isIOS() || isStandalone());
+    body = `${obProgress(4, true)}
+      <div class="ob-bell">${ICONS.bell}</div>
+      <div class="stack sm-gap ob-title center"><h1>${t('obNotifyTitle')}</h1><p class="muted">${t('obNotifyHint')}</p></div>
+      <section class="card ob-list"><div class="row-between"><span>${t('btnAtt')}</span><span class="muted sm">9:01 · 5:01 · 1:01</span></div><div class="row-between"><span>${t('notifyExit')}</span><span class="muted sm">${t('byPunch')}</span></div><div class="row-between"><span>${t('stationAnn')}</span><span class="muted sm">${t('annKinds')}</span></div></section>
+      ${canPush ? '' : `<span class="muted sm center">${t('installFirst')}</span>`}
+      <div class="stack ob-next">${canPush ? `<button type="button" class="btn primary" data-act="obEnablePush">${t('obEnable')}</button>` : ''}<button type="button" class="btn" data-act="obFinish">${t('obWithout')}</button></div>`;
+  }
+  return `<div class="onboard-flow">${body}</div>${installHint()}`;
+}
+function obFinish() { obActive = false; obStep = 1; save(); view = 'today'; render(); toast(`${t('hello')} ${S.settings.name}`); }
+
+/* ---------- عبارة الترحيب حسب الوقت والشفت ---------- */
+function greeting() {
+  const n = esc(S.settings.name), date = activeDate(), sh = shiftOf(group(), date), lv = leaveOn(date), d = S.days[date] || {};
+  if (lv) return lv.type === 'sick' ? `${t('gSick')} 🤲` : lv.type === 'emergency' ? `${t('gEmergency')} ${n}` : `${t('gAnnual')} ${n} 🌴`;
+  if (!isWorkShift(sh)) return `${t('gRest')} ${n} 😌`;
+  if (d.out) return `${t('gDone')} 👏`;
+  const nr = nowRel(date), st = RULES.shifts[sh].start;
+  if (d.in || nr >= st) return `${t('gWorking')} ${n} 💪🏻`;
+  if (sh === 'N') return `${t('gNight')} 🌙`;
+  if (sh === 'A') return `${t('gEvening')} ${n} 🌤️`;
+  return `${t('gMorning')} ${n} ☀️`;
 }
 
 function renderToday() {
-  if (!group() || !S.settings.name) return renderOnboarding();
+  if (obActive) return renderOnboarding();
 
   const date = activeDate(), sh = shiftOf(group(), date), d = S.days[date] || {}, hol = holidayOn(date), lv = leaveOn(date);
   const ym = todayISO().slice(0, 7), u = monthUsage(ym);
@@ -289,7 +339,7 @@ function renderToday() {
     decor = SEASON_ART.national;
     banner = `<section class="card national-banner">${SEASON_ART.flag}<div class="stack sm-gap"><b class="season-title">${t('halaFeb')}</b><span class="sm">${t('nationalWish')}</span></div></section>`;
   }
-  return `${decor}<header class="top${decor ? ' with-decor season-' + season : ''}"><div>${kicker}<div class="muted">${dateLine}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header><div class="cols"><div class="col">${annBanner()}${banner}${primaryCol}</div><div class="col">${main}</div></div>`;
+  return `${decor}<header class="top${decor ? ' with-decor season-' + season : ''}"><div>${kicker}<div class="muted">${dateLine}</div><h1>${greeting()}</h1></div>${groupChip()}</header><div class="cols"><div class="col">${annBanner()}${banner}${primaryCol}</div><div class="col">${main}</div></div>`;
 }
 
 /* ---------- دائرة الشفت: قبل البداية تعدّ تنازلياً، وأثناء الدوام تمتلئ حتى وقت الخروج ---------- */
@@ -601,11 +651,15 @@ document.addEventListener('click', ev => {
     case 'nav': view = v; closeSheet(); render(); window.scrollTo(0, 0); break;
     case 'setGroup': S.settings.group = v; save(); render(); break;
     case 'obGroup': obGroup = v; render(); break;
-    case 'obDone': {
-      const n = (obName || '').trim().slice(0, 30);
-      if (!n || !obGroup) break;
-      S.settings.name = n; S.settings.group = obGroup; save(); render(); toast(`${t('hello')} ${n}`); break;
-    }
+    case 'obNext':
+      if (obStep === 1) { const n = (obName || '').trim().slice(0, 30); if (!n) break; S.settings.name = n; obStep = 2; }
+      else if (obStep === 2) { if (!obGroup) break; S.settings.group = obGroup; obStep = 3; }
+      else if (obStep === 3) obStep = 4;
+      save(); render(); window.scrollTo(0, 0); break;
+    case 'obSkip': if (obStep === 3) { obStep = 4; render(); } else obFinish(); break;
+    case 'obFinish': obFinish(); break;
+    case 'obEnablePush': enablePush().then(obFinish); break;
+    case 'obInstallLater': obInstallDismissed = true; try { sessionStorage.setItem('mewshift.installHint', '1'); } catch (e) { /* */ } render(); break;
     case 'punch': doPunch(v); break;
     case 'editDay': case 'openDay': daySheet(v); break;
     case 'forgotAtt': mutate(v, () => { S.days[v] = Object.assign({}, S.days[v], { attMissed: true }); }); sourceSheet(v, 'att', RULES.attPenalty); break;
@@ -640,8 +694,8 @@ document.addEventListener('input', ev => {
   const el = ev.target;
   if (el.dataset && el.dataset.act === 'obName') {
     obName = el.value;
-    const btn = document.querySelector('[data-act="obDone"]');
-    if (btn) btn.disabled = !(obName.trim() && obGroup);
+    const btn = document.querySelector('[data-act="obNext"]');
+    if (btn) btn.disabled = !obName.trim();
   }
 });
 
@@ -846,6 +900,7 @@ const ICONS = {
   bell: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'
 };
