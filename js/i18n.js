@@ -14,7 +14,7 @@ const I18N = {
     btnIn: 'دخول', btnAtt: 'تواجد', btnOut: 'انصراف', forgot: 'نسيت',
     attMissedQ: 'لم تسجّل بصمة التواجد. هل بصمت؟', enterTime: 'أدخل الوقت', forgotDeduct: 'نسيت — اخصم ساعة',
     attWindow: 'نافذة التواجد', willNotify: 'سيصلك تنبيه',
-    leave_annual: 'إجازة سنوية', leave_sick: 'إجازة مرضية', leave_emergency: 'إجازة طارئة',
+    leave_annual: 'إجازة سنوية', leave_sick: 'إجازة مرضية', leave_emergency: 'إجازة عارضة',
     nextShift: 'الشفت القادم', permLeft: 'الأذونات المتبقية', of: 'من', timesLeft: 'باقي', lateLeft: 'التأخيرات المتبقية',
     renewsOn: 'يتجدد', nextDays: 'الأيام القادمة', prevMonth: 'الشهر السابق', nextMonth: 'الشهر التالي',
     holiday: 'عطلة رسمية', holidayOnWork: 'عطلة في يوم دوام', leave: 'إجازة',
@@ -43,7 +43,9 @@ const I18N = {
     saved: 'تم الحفظ', leaveAdded: 'أُضيفت الإجازة', attDone: 'تم تسجيل التواجد', outDone: 'تم تسجيل الانصراف',
     attNow: 'حان وقت بصمة التواجد', exitNow: 'حان وقت الانصراف',
     lateExhausted: 'تم النفاد: رصيد التأخيرات', permExhausted: 'تم النفاد: ساعات الأذونات', permTimesExhausted: 'تم النفاد: مرات الأذونات',
-    overBalance: 'تجاوزت الرصيد الشهري'
+    overBalance: 'تجاوزت الرصيد الشهري',
+    btnSick: 'طبية', btnEmergency: 'عارضة', sickAdded: 'سُجّلت طبية اليوم', emergencyAdded: 'سُجّلت عارضة اليوم',
+    cancelLeave: 'إلغاء الإجازة', cancelLeaveQ: 'هل تريد إلغاء إجازة هذا اليوم؟', leaveCancelled: 'أُلغيت الإجازة', alreadyLeave: 'هذا اليوم مسجّل إجازة', insteadOf: 'بدل شفت'
   },
   en: {
     am: 'AM', pm: 'PM', hShort: 'h', mShort: 'm',
@@ -88,6 +90,8 @@ const I18N = {
     saved: 'Saved', leaveAdded: 'Leave added', attDone: 'Presence recorded', outDone: 'Out recorded',
     attNow: 'Time for your presence punch', exitNow: 'Time to leave',
     lateExhausted: 'Used up: lateness balance', permExhausted: 'Used up: permission hours', permTimesExhausted: 'Used up: permission times',
-    overBalance: 'Monthly balance exceeded'
+    overBalance: 'Monthly balance exceeded',
+    btnSick: 'Sick', btnEmergency: 'Emergency', sickAdded: 'Sick day recorded', emergencyAdded: 'Emergency leave recorded',
+    cancelLeave: 'Cancel leave', cancelLeaveQ: 'Cancel the leave for this day?', leaveCancelled: 'Leave cancelled', alreadyLeave: 'This day is already leave', insteadOf: 'Instead of'
   }
 };

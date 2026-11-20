@@ -131,7 +131,8 @@ function annualRemaining() {
   }
   return bal;
 }
-function leaveOn(date) { return S.leaves.find(l => date >= l.from && date <= l.to && !isFriday(date) && !holidayOn(date)) || null; }
+/* لعرض اليوم كإجازة وحساب الحضور: كل أيام الفترة. الخصم من الرصيد يستثني الجمعة والعطل (leaveDays). */
+function leaveOn(date) { return S.leaves.find(l => date >= l.from && date <= l.to) || null; }
 
 function stats(from, to) {
   const end = to < todayISO() ? to : todayISO();
@@ -214,6 +215,10 @@ function renderToday() {
         ${punchBtn('in', d.in, t('btnIn'), e ? '' : fmt12(RULES.shifts[sh].start))}
         ${punchBtn('att', d.att, t('btnAtt'), d.attMissed ? t('forgot') : `${fmtPlain(win.from)} – ${fmtPlain(win.to)}`, !d.att && !d.attMissed && d.in)}
         ${punchBtn('out', d.out, t('btnOut'), e ? fmt12(e.exit) : '')}
+      </div>
+      <div class="grid2">
+        <button type="button" class="leave-btn" data-act="quickLeave" data-v="sick"><span class="emo" aria-hidden="true">🏥</span><b>${t('btnSick')}</b></button>
+        <button type="button" class="leave-btn" data-act="quickLeave" data-v="emergency"><span class="emo" aria-hidden="true">🚨</span><b>${t('btnEmergency')}</b></button>
       </div>`;
     if (d.in && !d.att && !d.attMissed && nr > win.to) {
       main += `<section class="card alert stack"><b>${t('attMissedQ')}</b><div class="grid2">
@@ -227,7 +232,9 @@ function renderToday() {
     main += `
       <section class="shift-card s-O${hol ? ' has-hol' : ''}">
         <div class="row-between"><span class="label">${t('todayShift')}</span>${hol ? `<span class="hol-tag">${esc(hol[S.settings.lang] || hol.ar)}</span>` : ''}</div>
-        <div class="shift-name">${lv ? t('leave_' + lv.type) : t('shift_O')}</div>
+        <div class="shift-name">${lv ? (lv.type === 'sick' ? '🏥 ' : lv.type === 'emergency' ? '🚨 ' : '') + t('leave_' + lv.type) : t('shift_O')}</div>
+        ${lv && isWorkShift(sh) ? `<div class="shift-hours">${t('insteadOf')} ${shiftName(sh)} · ${shiftHours(sh)}</div>` : ''}
+        ${lv ? `<button type="button" class="btn" data-act="cancelLeave" data-v="${lv.id}">${t('cancelLeave')}</button>` : ''}
         ${next ? `<div class="shift-hours">${t('nextShift')}: ${shiftName(next.s)} — ${dayName(next.d)} ${fmt12(RULES.shifts[next.s].start)}</div>` : ''}
       </section>`;
   }
@@ -466,6 +473,9 @@ document.addEventListener('click', ev => {
     case 'askNotify': if ('Notification' in window) Notification.requestPermission().then(render); break;
     case 'delPerm': { const p = S.perms.find(x => x.id === v); S.perms = S.perms.filter(x => x.id !== v); save(); render(); if (p) daySheet(p.date); break; }
     case 'delLeave': { const l = S.leaves.find(x => x.id === v); S.leaves = S.leaves.filter(x => x.id !== v); save(); render(); if (l) daySheet(l.from); break; }
+    case 'quickLeave': quickLeave(v); break;
+    case 'cancelLeave': openSheet(`<h2>${t('cancelLeave')}</h2><p>${t('cancelLeaveQ')}</p><div class="grid2"><button type="button" class="btn" data-act="closeSheet">${t('cancel')}</button><button type="button" class="btn danger" data-act="cancelLeaveDo" data-v="${v}">${t('cancelLeave')}</button></div>`); break;
+    case 'cancelLeaveDo': S.leaves = S.leaves.filter(x => x.id !== v); save(); closeSheet(); render(); toast(t('leaveCancelled')); break;
     case 'closeSheet': closeSheet(); break;
     case 'resetAsk': openSheet(`<h2>${t('resetAll')}</h2><p>${t('resetConfirm')}</p><div class="grid2"><button type="button" class="btn" data-act="closeSheet">${t('cancel')}</button><button type="button" class="btn danger" data-act="resetDo">${t('delete')}</button></div>`); break;
     case 'resetDo': S = JSON.parse(JSON.stringify(DEFAULT)); save(); closeSheet(); view = 'today'; render(); break;
@@ -506,6 +516,15 @@ document.addEventListener('submit', ev => {
     toast(`${t('leaveAdded')}: ${leaveDays(from, to).length} ${t('day')}`); daySheet(from);
   }
 });
+
+function quickLeave(type) {
+  const date = activeDate();
+  if (leaveOn(date)) { toast(t('alreadyLeave'), true); return; }
+  S.leaves.push({ id: uid(), type, from: date, to: date }); save(); render();
+  const y = date.slice(0, 4), lu = leaveUsage(y);
+  if (type === 'sick') toast(`${t('sickAdded')} · ${t('left')} ${Math.max(0, RULES.sickPerYear - lu.sick)} ${t('of')} ${RULES.sickPerYear}`, lu.sick > RULES.sickPerYear);
+  else toast(`${t('emergencyAdded')} · ${t('left')} ${Math.max(0, RULES.emergencyPerYear - lu.emergency)} ${t('of')} ${RULES.emergencyPerYear}`, lu.emergency > RULES.emergencyPerYear);
+}
 
 function doPunch(kind) {
   const date = activeDate(), sh = shiftOf(group(), date);
