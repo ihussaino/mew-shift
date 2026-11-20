@@ -3,7 +3,7 @@
 
 const KEY = 'mewshift.v1';
 /* رابط منبّه الإشعارات على Cloudflare (فارغ = غير مفعّل بعد) */
-const PUSH_API = '';
+const PUSH_API = 'https://mew-shift-push.ihussain-u14.workers.dev';
 const DEFAULT = {
   settings: {
     group: null, grade: 45, annualBase: null, annualBaseDate: null,
@@ -423,7 +423,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v0.6</p>`;
+    <p class="muted sm center">MEW Shift · v0.7</p>`;
 }
 
 /* ---------- النوافذ (Sheets) ---------- */
