@@ -390,7 +390,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v0.1</p>`;
+    <p class="muted sm center">MEW Shift · v0.4</p>`;
 }
 
 /* ---------- النوافذ (Sheets) ---------- */
@@ -599,4 +599,15 @@ render();
 setInterval(() => { tick(); }, 30000);
 tick();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); tick(); } });
-if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+/* التحديث التلقائي: يفحص عند كل فتح، ويعيد تحميل التطبيق مرة واحدة عند وصول نسخة جديدة */
+if ('serviceWorker' in navigator) {
+  let reloaded = false;
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {});
+  });
+}

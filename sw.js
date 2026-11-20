@@ -1,16 +1,16 @@
 /* يحفظ ملفات التطبيق ليعمل بدون إنترنت. غيّر الرقم عند كل تحديث. */
-const CACHE = 'mewshift-v3';
-const FILES = ['./', 'index.html', 'css/app.css?v=3', 'js/i18n.js?v=3', 'js/rules.js?v=3', 'js/app.js?v=3', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+const CACHE = 'mewshift-v4';
+const FILES = ['./', 'index.html', 'css/app.css?v=4', 'js/i18n.js?v=4', 'js/rules.js?v=4', 'js/app.js?v=4', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
-/* الشبكة أولاً، والنسخة المحفوظة عند انقطاع الإنترنت */
+/* الشبكة أولاً (مع تجاوز ذاكرة المتصفح المؤقتة)، والنسخة المحفوظة عند انقطاع الإنترنت */
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request).then(res => {
+    fetch(e.request, new URL(e.request.url).origin === location.origin ? { cache: 'no-cache' } : {}).then(res => {
       if (res.ok && new URL(e.request.url).origin === location.origin) {
         const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy));
       }
