@@ -10,4 +10,4 @@ crons = ["* * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "mew-shift"
-database_id = "REPLACE_WITH_DATABASE_ID"
+database_id = "8681a1f4-330e-48b9-8289-362a0e932d8c"
