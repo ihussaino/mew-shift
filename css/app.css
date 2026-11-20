@@ -234,3 +234,48 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
 [data-season="national"] .punch.k-in:not(.done) svg,[data-season="national"] .punch.k-att:not(.done):not(.primary) svg{color:#007A3D}
 [data-season="national"] .punch.k-out:not(.done) svg{color:#CE1126}
 [data-theme="dark"][data-season="national"] .punch.k-in:not(.done) svg{color:#3FB168}
+
+/* ---------- الأعمدة (الجوال: عمود واحد) ---------- */
+.cols,.col{display:flex;flex-direction:column;gap:14px}
+.settings-grid{display:flex;flex-direction:column;gap:14px}
+.nav-brand{display:none}
+
+/* ---------- الكمبيوتر والشاشات الكبيرة ---------- */
+@media (min-width: 900px){
+  body{min-height:100vh}
+  #nav{position:fixed;top:0;bottom:0;inset-inline-start:0;left:auto;right:auto;width:240px;display:flex;flex-direction:column;gap:4px;
+    padding:28px 16px;border-top:0;border-inline-end:1px solid var(--line)}
+  [dir="rtl"] #nav{right:0}
+  [dir="ltr"] #nav{left:0}
+  .nav-brand{display:flex;align-items:center;gap:12px;padding:0 8px 22px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+  .nav-brand img{border-radius:12px;background:#FFFFFF}
+  .nav-brand b{display:block;font-size:17px}
+  .nav-brand span{font-size:12px;color:var(--muted)}
+  .nav-btn{flex-direction:row;justify-content:flex-start;gap:12px;padding:10px 14px;min-height:46px;border-radius:12px;font-size:15px}
+  .nav-btn:hover{background:var(--soft)}
+  .nav-btn.on{background:var(--soft)}
+  #app{max-width:1120px;padding:40px 48px 48px;margin-inline-start:240px;margin-inline-end:auto}
+  [dir="rtl"] #app{margin-right:240px;margin-left:auto}
+  [dir="ltr"] #app{margin-left:240px;margin-right:auto}
+  h1{font-size:28px}
+
+  .cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+  .cal-cols{grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr)}
+  .cell{height:74px;font-size:18px}
+  .cal{padding:18px}
+  .cal-cols .legend{flex-direction:column;gap:10px;font-size:14px}
+  .settings-grid{display:block;columns:2;column-gap:20px}
+  .settings-grid>section{break-inside:avoid;margin-bottom:20px}
+  .about{max-width:620px;margin:0 auto;width:100%}
+  .shift-name{font-size:40px}
+  .cd-time{font-size:32px}
+
+  .sheet{top:50%;bottom:auto;left:50%;right:auto;transform:translate(-50%,-50%);width:560px;max-height:86vh;border-radius:22px}
+  .grab{display:none}
+  .toast{bottom:32px}
+  .season-decor.ramadan,.season-decor.national{max-width:1120px}
+  .top.season-ramadan{margin-top:120px}
+}
+@media (min-width: 900px) and (hover: hover){
+  .punch:hover,.leave-btn:not(:disabled):hover,.mini:hover,.cell:hover{filter:brightness(.97)}
+}

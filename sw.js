@@ -1,6 +1,6 @@
 /* يحفظ ملفات التطبيق ليعمل بدون إنترنت. غيّر الرقم عند كل تحديث. */
-const CACHE = 'mewshift-v14';
-const FILES = ['./', 'index.html', 'css/app.css?v=14', 'js/i18n.js?v=14', 'js/rules.js?v=14', 'js/app.js?v=14', 'manifest.webmanifest?v=3', 'icons/icon-192.png?v=3', 'icons/icon-512.png?v=3', 'icons/apple-touch-icon.png?v=3', 'img/ihussain-black.png', 'img/ihussain-white.png'];
+const CACHE = 'mewshift-v15';
+const FILES = ['./', 'index.html', 'css/app.css?v=15', 'js/i18n.js?v=15', 'js/rules.js?v=15', 'js/app.js?v=15', 'manifest.webmanifest?v=3', 'icons/icon-192.png?v=3', 'icons/icon-512.png?v=3', 'icons/apple-touch-icon.png?v=3', 'img/ihussain-black.png', 'img/ihussain-white.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

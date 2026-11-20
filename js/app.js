@@ -184,7 +184,7 @@ function render() {
 
 function renderNav() {
   const items = [['today', 'navToday', ICONS.home], ['calendar', 'navCalendar', ICONS.cal], ['records', 'navRecords', ICONS.chart], ['settings', 'navSettings', ICONS.gear], ['about', 'navAbout', ICONS.info]];
-  document.getElementById('nav').innerHTML = items.map(([k, l, ic]) =>
+  document.getElementById('nav').innerHTML = `<div class="nav-brand"><img src="icons/icon-192.png?v=3" alt="" width="44" height="44"><div><b>MEW Shift</b><span>${t('station')}</span></div></div>` + items.map(([k, l, ic]) =>
     `<button type="button" class="nav-btn${view === k ? ' on' : ''}" data-act="nav" data-v="${k}" aria-current="${view === k ? 'page' : 'false'}">${ic}<span>${t(l)}</span></button>`).join('');
 }
 
@@ -266,6 +266,7 @@ function renderToday() {
       </section>`;
   }
 
+  const primaryCol = main; main = '';
   main += `
     <div class="grid2">
       ${balanceCard(t('permLeft'), fmtDur(permLeft), t('of') + ' 12 ' + t('hShort'), permLeft / RULES.monthlyPermMinutes, `${t('timesLeft')} ${timesLeft} ${t('of')} 4`, 'primary')}
@@ -286,7 +287,7 @@ function renderToday() {
     decor = SEASON_ART.national;
     banner = `<section class="card national-banner">${SEASON_ART.flag}<div class="stack sm-gap"><b class="season-title">${t('halaFeb')}</b><span class="sm">${t('nationalWish')}</span></div></section>`;
   }
-  return `${decor}<header class="top${decor ? ' with-decor season-' + season : ''}"><div>${kicker}<div class="muted">${dateLine}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header>${banner}${main}`;
+  return `${decor}<header class="top${decor ? ' with-decor season-' + season : ''}"><div>${kicker}<div class="muted">${dateLine}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header><div class="cols"><div class="col">${banner}${primaryCol}</div><div class="col">${main}</div></div>`;
 }
 
 /* ---------- العد التنازلي ---------- */
@@ -354,6 +355,7 @@ function renderCalendar() {
     <div class="seg group-seg" role="group" aria-label="${t('viewGroup')}">${['A', 'B', 'C', 'D', 'E'].map(x =>
       `<button type="button" class="${x === g ? 'on' : ''}" data-act="calGroup" data-v="${x}" aria-pressed="${x === g}">${x}${x === group() ? '<small>' + t('mine') + '</small>' : ''}</button>`).join('')}</div>
     ${mine ? '' : `<div class="card info-row viewing"><span>${t('viewingGroup')} <b>${g}</b></span><button type="button" class="link" data-act="calGroup" data-v="${group()}">${t('backToMine')}</button></div>`}
+    <div class="cols cal-cols"><div class="col">
     <div class="month-nav">
       <button type="button" class="icon-btn" data-act="month" data-v="-1" aria-label="${t('prevMonth')}">${S.settings.lang === 'ar' ? ICONS.right : ICONS.left}</button>
       <b>${monthName(m)} ${y}</b>
@@ -363,12 +365,14 @@ function renderCalendar() {
       <div class="cal-grid head">${t('weekdaysShort').split(',').map(w => `<span>${w}</span>`).join('')}</div>
       <div class="cal-grid">${cells}</div>
     </section>
+    </div><div class="col">
     <div class="legend">
       <span><i class="sw s-M"></i>${t('shift_M')}</span><span><i class="sw s-A"></i>${t('shift_A')}</span><span><i class="sw s-N"></i>${t('shift_N')}</span>
       <span><i class="sw s-O"></i>${t('shift_O')}</span><span><i class="sw hol"></i>${t('holiday')}</span><span><i class="sw s-M has-hol"></i>${t('holidayOnWork')}</span><span><i class="leave-dot static"></i>${t('leave')}</span>
     </div>
     ${hols.length ? `<section class="card stack">${hols.map(h => `<div class="row-between"><span>${esc(h[S.settings.lang] || h.ar)}</span><span class="muted">${fmtShort(h.from)}${h.to !== h.from ? ' – ' + fmtShort(h.to) : ''}</span></div>`).join('')}</section>` : ''}
-    <section class="summary"><span>${t('monthHours')}</span><b>${work * RULES.shiftHours} ${t('hour')} · ${work} ${t('workDays')}</b></section>`;
+    <section class="summary"><span>${t('monthHours')}</span><b>${work * RULES.shiftHours} ${t('hour')} · ${work} ${t('workDays')}</b></section>
+    </div></div>`;
 }
 
 function renderRecords() {
@@ -422,6 +426,7 @@ function renderSettings() {
   const notifState = ('Notification' in window) ? Notification.permission : 'unsupported';
   return `
     <header class="top"><h1>${t('navSettings')}</h1></header>
+    <div class="settings-grid">
     <section class="card stack">
       <label class="stack sm-gap"><b>${t('yourName')}</b>
         <input type="text" class="text-in" data-act="setName" value="${esc(s.name || '')}" maxlength="30" autocomplete="given-name"></label>
@@ -465,7 +470,8 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v1.4</p>`;
+    </div>
+    <p class="muted sm center">MEW Shift · v1.5</p>`;
 }
 
 function renderAbout() {
