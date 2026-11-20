@@ -169,6 +169,7 @@ function mutate(date, fn) {
 const $app = () => document.getElementById('app');
 
 function render() {
+  if (sharedView()) return;
   applyTheme();
   document.documentElement.lang = S.settings.lang;
   document.documentElement.dir = S.settings.lang === 'ar' ? 'rtl' : 'ltr';
@@ -287,7 +288,7 @@ function renderToday() {
     decor = SEASON_ART.national;
     banner = `<section class="card national-banner">${SEASON_ART.flag}<div class="stack sm-gap"><b class="season-title">${t('halaFeb')}</b><span class="sm">${t('nationalWish')}</span></div></section>`;
   }
-  return `${decor}<header class="top${decor ? ' with-decor season-' + season : ''}"><div>${kicker}<div class="muted">${dateLine}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header><div class="cols"><div class="col">${banner}${primaryCol}</div><div class="col">${main}</div></div>`;
+  return `${decor}<header class="top${decor ? ' with-decor season-' + season : ''}"><div>${kicker}<div class="muted">${dateLine}</div><h1>${t('hello')} ${esc(S.settings.name)}</h1></div>${groupChip()}</header><div class="cols"><div class="col">${annBanner()}${banner}${primaryCol}</div><div class="col">${main}</div></div>`;
 }
 
 /* ---------- العد التنازلي ---------- */
@@ -360,6 +361,7 @@ function renderCalendar() {
     <div class="seg group-seg" role="group" aria-label="${t('viewGroup')}">${['A', 'B', 'C', 'D', 'E'].map(x =>
       `<button type="button" class="${x === g ? 'on' : ''}" data-act="calGroup" data-v="${x}" aria-pressed="${x === g}">${x}${x === group() ? '<small>' + t('mine') + '</small>' : ''}</button>`).join('')}</div>
     ${mine ? '' : `<div class="card info-row viewing"><span>${t('viewingGroup')} <b>${g}</b></span><button type="button" class="link" data-act="calGroup" data-v="${group()}">${t('backToMine')}</button></div>`}
+    ${mine ? `<div class="grid2"><button type="button" class="btn feature-btn" data-act="openPlanner">✨ ${t('plannerTitle')}</button><button type="button" class="btn feature-btn" data-act="shareSchedule">${ICONS.share} ${t('shareSchedule')}</button></div>` : ''}
     <div class="cols cal-cols"><div class="col">
     <div class="month-nav">
       <button type="button" class="icon-btn" data-act="month" data-v="-1" aria-label="${t('prevMonth')}">${S.settings.lang === 'ar' ? ICONS.right : ICONS.left}</button>
@@ -392,6 +394,7 @@ function renderRecords() {
       <button type="button" class="${recRange === 'month' ? 'on' : ''}" data-act="range" data-v="month">${monthName(Number(td.slice(5, 7)))}</button>
       <button type="button" class="${recRange === 'year' ? 'on' : ''}" data-act="range" data-v="year">${t('year')} ${y}</button>
     </div>
+    <button type="button" class="btn feature-btn summary-btn" data-act="openSummary">📸 ${t('summaryTitle')}</button>
     <section class="card ring-card">
       <svg width="104" height="104" viewBox="0 0 104 104" role="img" aria-label="${t('attendance')} ${st.pct}%">
         <circle cx="52" cy="52" r="44" fill="none" stroke="var(--line)" stroke-width="10"></circle>
@@ -476,7 +479,7 @@ function renderSettings() {
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
     </div>
-    <p class="muted sm center">MEW Shift · v1.7</p>`;
+    <p class="muted sm center">MEW Shift · v1.8</p>`;
 }
 
 function renderAbout() {
@@ -589,6 +592,7 @@ document.addEventListener('click', ev => {
     case 'cancelLeave': openSheet(`<h2>${t('cancelLeave')}</h2><p>${t('cancelLeaveQ')}</p><div class="grid2"><button type="button" class="btn" data-act="closeSheet">${t('cancel')}</button><button type="button" class="btn danger" data-act="cancelLeaveDo" data-v="${v}">${t('cancelLeave')}</button></div>`); break;
     case 'cancelLeaveDo': S.leaves = S.leaves.filter(x => x.id !== v); save(); closeSheet(); render(); toast(t('leaveCancelled')); break;
     case 'closeSheet': closeSheet(); break;
+    default: if (FEATURE_ACTIONS[act]) FEATURE_ACTIONS[act](v, el); break;
     case 'resetAsk': openSheet(`<h2>${t('resetAll')}</h2><p>${t('resetConfirm')}</p><div class="grid2"><button type="button" class="btn" data-act="closeSheet">${t('cancel')}</button><button type="button" class="btn danger" data-act="resetDo">${t('delete')}</button></div>`); break;
     case 'resetDo': S = JSON.parse(JSON.stringify(DEFAULT)); save(); closeSheet(); view = 'today'; render(); break;
   }
@@ -619,6 +623,7 @@ document.addEventListener('change', ev => {
 document.addEventListener('submit', ev => {
   const f = ev.target; ev.preventDefault();
   const fd = new FormData(f);
+  if (FEATURE_SUBMIT[f.dataset.form]) { FEATURE_SUBMIT[f.dataset.form](f, fd); return; }
   if (f.dataset.form === 'punches') {
     const date = f.dataset.date;
     mutate(date, () => {
@@ -721,7 +726,7 @@ function notify(msg) {
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification('MEW Shift', { body: msg, icon: 'icons/icon-192.png?v=3' }); } catch (e) { /* */ }
 }
 function tick() {
-  if (!group()) return;
+  if (SPECIAL_PAGE || !group()) return;
   const date = activeDate(), sh = shiftOf(group(), date), d = S.days[date] || {};
   if (!isWorkShift(sh) || leaveOn(date)) return;
   const nr = nowRel(date), win = attWindow(sh);
@@ -803,6 +808,7 @@ const ICONS = {
   bell: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'
 };
 
@@ -810,6 +816,7 @@ const ICONS = {
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if (S.settings.group) save();
 render();
+fetchAnnouncements();
 if (S.push) syncPush();
 setInterval(() => { tick(); }, 30000);
 setInterval(updateCountdowns, 1000);

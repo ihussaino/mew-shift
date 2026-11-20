@@ -44,7 +44,9 @@ async function init(env) {
       grp TEXT NOT NULL, lang TEXT NOT NULL DEFAULT 'ar', att INTEGER NOT NULL DEFAULT 1, exit INTEGER NOT NULL DEFAULT 1,
       skip TEXT NOT NULL DEFAULT '', exit_at TEXT, updated TEXT)`),
     env.DB.prepare('CREATE INDEX IF NOT EXISTS subs_grp ON subs (grp)'),
-    env.DB.prepare('CREATE TABLE IF NOT EXISTS config (k TEXT PRIMARY KEY, v TEXT NOT NULL)')
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS config (k TEXT PRIMARY KEY, v TEXT NOT NULL)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS ann (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, body TEXT NOT NULL, created TEXT NOT NULL)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL, payload TEXT NOT NULL, created INTEGER NOT NULL)')
   ]);
   ready = true;
 }
@@ -114,37 +116,66 @@ async function sendPush(env, sub, payload) {
   return res.status;
 }
 
-/* ---------- المنبّه (كل دقيقة) ---------- */
+/* ---------- المنبّه (كل دقيقة) ----------
+   الخطة المجانية في Cloudflare تسمح بـ 50 طلباً خارجياً في كل تشغيل،
+   لذلك تُوضع الرسائل في طابور (outbox) ويُرسل منها 40 كل دقيقة. */
+const SEND_PER_TICK = 40;
+const MAX_AGE_MS = 50 * 60 * 1000; // رسالة أقدم من 50 دقيقة لا تُرسل
+
+async function enqueue(env, rows, payloadFor, nowMs) {
+  if (!rows.length) return 0;
+  const stmts = rows.map(r => env.DB.prepare('INSERT INTO outbox (endpoint, payload, created) VALUES (?, ?, ?)').bind(r.endpoint, JSON.stringify(payloadFor(r)), nowMs));
+  for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
+  return rows.length;
+}
+
+export async function drain(env, nowMs) {
+  const { results } = await env.DB.prepare(`SELECT o.id AS oid, o.payload AS payload, o.created AS created, s.* FROM outbox o
+    LEFT JOIN subs s ON s.endpoint = o.endpoint ORDER BY o.id LIMIT ?`).bind(SEND_PER_TICK).all();
+  if (!results.length) return 0;
+  const jobs = [];
+  for (const r of results) {
+    if (!r.p256dh || nowMs - r.created > MAX_AGE_MS) continue;
+    jobs.push(sendPush(env, r, JSON.parse(r.payload)));
+  }
+  await Promise.allSettled(jobs);
+  const ids = results.map(r => r.oid);
+  await env.DB.prepare(`DELETE FROM outbox WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).run();
+  return jobs.length;
+}
+
 export async function runTick(env, nowMs) {
   await init(env);
   const kw = new Date(nowMs + KUWAIT_OFFSET_MS).toISOString();
   const hhmm = kw.slice(11, 16), today = kw.slice(0, 10);
-  const jobs = [];
 
   const a = ATT_TIMES[hhmm];
   if (a) {
     const date = addDays(today, -a.back);
     for (const g of groupsOn(a.shift, date)) {
-      const { results } = await env.DB.prepare('SELECT * FROM subs WHERE grp = ? AND att = 1').bind(g).all();
-      for (const s of results) {
-        if (s.skip && s.skip.split(',').includes(date)) continue;
-        const m = MSG[s.lang] || MSG.ar;
-        jobs.push(sendPush(env, s, { title: m.att, body: m.attBody, tag: 'att-' + date }));
-      }
+      const { results } = await env.DB.prepare('SELECT endpoint, lang, skip FROM subs WHERE grp = ? AND att = 1').bind(g).all();
+      const due = results.filter(s => !(s.skip && s.skip.split(',').includes(date)));
+      await enqueue(env, due, s => { const m = MSG[s.lang] || MSG.ar; return { title: m.att, body: m.attBody, tag: 'att-' + date }; }, nowMs);
     }
   }
 
   const nowIso = new Date(nowMs).toISOString().slice(0, 16);
   const oldest = new Date(nowMs - 15 * 60000).toISOString().slice(0, 16);
-  const { results: exits } = await env.DB.prepare('SELECT * FROM subs WHERE exit = 1 AND exit_at IS NOT NULL AND exit_at <= ?').bind(nowIso).all();
-  for (const s of exits) {
-    await env.DB.prepare('UPDATE subs SET exit_at = NULL WHERE endpoint = ?').bind(s.endpoint).run();
-    if (s.exit_at < oldest) continue; // قديم جداً، لا نرسله متأخراً
-    const m = MSG[s.lang] || MSG.ar;
-    jobs.push(sendPush(env, s, { title: m.exit, body: m.exitBody, tag: 'exit-' + s.exit_at }));
+  const { results: exits } = await env.DB.prepare('SELECT endpoint, lang, exit_at FROM subs WHERE exit = 1 AND exit_at IS NOT NULL AND exit_at <= ?').bind(nowIso).all();
+  if (exits.length) {
+    await env.DB.prepare('UPDATE subs SET exit_at = NULL WHERE exit = 1 AND exit_at IS NOT NULL AND exit_at <= ?').bind(nowIso).run();
+    await enqueue(env, exits.filter(s => s.exit_at >= oldest), s => { const m = MSG[s.lang] || MSG.ar; return { title: m.exit, body: m.exitBody, tag: 'exit-' + s.exit_at }; }, nowMs);
   }
-  const out = await Promise.allSettled(jobs);
-  return out.length;
+  return drain(env, nowMs);
+}
+
+/* مقارنة كلمة السر بوقت ثابت */
+function sameKey(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || !b) return false;
+  const x = enc(a), y = enc(b);
+  let d = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) d |= (x[i] || 0) ^ (y[i] || 0);
+  return d === 0;
 }
 
 /* ---------- واجهة التطبيق ---------- */
@@ -192,6 +223,27 @@ export default {
       if (url.pathname === '/unsubscribe' && req.method === 'POST') {
         const b = await req.json();
         if (typeof b.endpoint === 'string') await env.DB.prepare('DELETE FROM subs WHERE endpoint = ?').bind(b.endpoint).run();
+        return json({ ok: true }, 200, h);
+      }
+      if (url.pathname === '/announcements' && req.method === 'GET') {
+        const { results } = await env.DB.prepare('SELECT id, title, body, created FROM ann ORDER BY id DESC LIMIT 5').all();
+        return json({ items: results }, 200, { ...h, 'Cache-Control': 'no-store' });
+      }
+      if (url.pathname === '/admin/broadcast' && req.method === 'POST') {
+        const b = await req.json();
+        if (!sameKey(b.key, env.ADMIN_KEY)) return json({ error: 'unauthorized' }, 401, h);
+        const title = String(b.title || '').trim().slice(0, 80), body = String(b.body || '').trim().slice(0, 300);
+        if (!title || !body) return json({ error: 'empty' }, 400, h);
+        const now = Date.now();
+        await env.DB.prepare('INSERT INTO ann (title, body, created) VALUES (?, ?, ?)').bind(title, body, new Date(now).toISOString()).run();
+        const r = await env.DB.prepare(`INSERT INTO outbox (endpoint, payload, created) SELECT endpoint, ?, ? FROM subs`)
+          .bind(JSON.stringify({ title: '📣 ' + title, body, tag: 'ann-' + now }), now).run();
+        return json({ ok: true, queued: (r.meta && r.meta.changes) || 0 }, 200, h);
+      }
+      if (url.pathname === '/admin/delete' && req.method === 'POST') {
+        const b = await req.json();
+        if (!sameKey(b.key, env.ADMIN_KEY)) return json({ error: 'unauthorized' }, 401, h);
+        await env.DB.prepare('DELETE FROM ann WHERE id = ?').bind(Number(b.id) || 0).run();
         return json({ ok: true }, 200, h);
       }
       if (url.pathname === '/test' && req.method === 'POST') {
