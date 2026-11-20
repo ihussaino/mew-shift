@@ -1,6 +1,6 @@
 /* يحفظ ملفات التطبيق ليعمل بدون إنترنت. غيّر الرقم عند كل تحديث. */
-const CACHE = 'mewshift-v8';
-const FILES = ['./', 'index.html', 'css/app.css?v=8', 'js/i18n.js?v=8', 'js/rules.js?v=8', 'js/app.js?v=8', 'manifest.webmanifest?v=2', 'icons/icon-192.png?v=2', 'icons/icon-512.png?v=2', 'icons/apple-touch-icon.png?v=2'];
+const CACHE = 'mewshift-v9';
+const FILES = ['./', 'index.html', 'css/app.css?v=9', 'js/i18n.js?v=9', 'js/rules.js?v=9', 'js/app.js?v=9', 'manifest.webmanifest?v=3', 'icons/icon-192.png?v=3', 'icons/icon-512.png?v=3', 'icons/apple-touch-icon.png?v=3'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
@@ -24,7 +24,7 @@ self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: 'MEW Shift', body: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(d.title || 'MEW Shift', {
-    body: d.body || '', tag: d.tag || 'mewshift', icon: 'icons/icon-192.png?v=2', badge: 'icons/icon-192.png?v=2', lang: 'ar', dir: 'auto'
+    body: d.body || '', tag: d.tag || 'mewshift', icon: 'icons/icon-192.png?v=3', badge: 'icons/icon-192.png?v=3', lang: 'ar', dir: 'auto'
   }));
 });
 self.addEventListener('notificationclick', e => {
