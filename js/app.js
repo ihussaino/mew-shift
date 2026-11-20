@@ -173,6 +173,7 @@ function render() {
   const html = view === 'today' ? renderToday() : view === 'calendar' ? renderCalendar() : view === 'records' ? renderRecords() : renderSettings();
   $app().innerHTML = html;
   renderNav();
+  updateCountdowns();
 }
 
 function renderNav() {
@@ -209,6 +210,7 @@ function renderToday() {
         <div class="row-between"><span class="label">${date !== todayISO() ? t('yesterdayShift') : t('todayShift')}</span>${hol ? `<span class="hol-tag">${esc(hol[S.settings.lang] || hol.ar)}</span>` : ''}</div>
         <div class="shift-name">${shiftName(sh)}</div>
         <div class="shift-hours">${shiftHours(sh)}</div>
+        ${!d.in ? countdownBox(tsOf(date, RULES.shifts[sh].start), 'start') : !d.out ? countdownBox(tsOf(date, e.exit), 'exit') : ''}
         ${status}
       </section>
       <div class="grid3">
@@ -217,8 +219,8 @@ function renderToday() {
         ${punchBtn('out', d.out, t('btnOut'), e ? fmt12(e.exit) : '')}
       </div>
       <div class="grid2">
-        <button type="button" class="leave-btn" data-act="quickLeave" data-v="sick"><span class="emo" aria-hidden="true">🏥</span><b>${t('btnSick')}</b></button>
-        <button type="button" class="leave-btn" data-act="quickLeave" data-v="emergency"><span class="emo" aria-hidden="true">🚨</span><b>${t('btnEmergency')}</b></button>
+        <button type="button" class="leave-btn" data-act="quickLeave" data-v="sick"${d.in ? ' disabled' : ''}><span class="emo" aria-hidden="true">🏥</span><b>${t('btnSick')}</b></button>
+        <button type="button" class="leave-btn" data-act="quickLeave" data-v="emergency"${d.in ? ' disabled' : ''}><span class="emo" aria-hidden="true">🚨</span><b>${t('btnEmergency')}</b></button>
       </div>`;
     if (d.in && !d.att && !d.attMissed && nr > win.to) {
       main += `<section class="card alert stack"><b>${t('attMissedQ')}</b><div class="grid2">
@@ -235,7 +237,7 @@ function renderToday() {
         <div class="shift-name">${lv ? (lv.type === 'sick' ? '🏥 ' : lv.type === 'emergency' ? '🚨 ' : '') + t('leave_' + lv.type) : t('shift_O')}</div>
         ${lv && isWorkShift(sh) ? `<div class="shift-hours">${t('insteadOf')} ${shiftName(sh)} · ${shiftHours(sh)}</div>` : ''}
         ${lv ? `<button type="button" class="btn" data-act="cancelLeave" data-v="${lv.id}">${t('cancelLeave')}</button>` : ''}
-        ${next ? `<div class="shift-hours">${t('nextShift')}: ${shiftName(next.s)} — ${dayName(next.d)} ${fmt12(RULES.shifts[next.s].start)}</div>` : ''}
+        ${next ? `<div class="shift-hours">${t('nextShift')}: ${shiftName(next.s)} — ${dayName(next.d)} ${fmt12(RULES.shifts[next.s].start)}</div>${countdownBox(tsOf(next.d, RULES.shifts[next.s].start), 'next')}` : ''}
       </section>`;
   }
 
@@ -250,6 +252,30 @@ function renderToday() {
     }).join('')}</div></section>`;
 
   return `<header class="top"><div><div class="muted">${fmtDate(todayISO())}</div><h1>MEW Shift</h1></div>${groupChip()}</header>${main}`;
+}
+
+/* ---------- العد التنازلي ---------- */
+function tsOf(date, minutes) { const [y, m, dd] = date.split('-').map(Number); return new Date(y, m - 1, dd).getTime() + minutes * 60000; }
+function countdownBox(target, mode) {
+  return `<div class="countdown" data-target="${target}" data-mode="${mode}"><span class="cd-label"></span><b class="cd-time" dir="ltr"></b></div>`;
+}
+function fmtCount(ms) {
+  const sec = Math.floor(Math.abs(ms) / 1000), days = Math.floor(sec / 86400);
+  const h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60), s2 = sec % 60;
+  const hms = [h, m, s2].map(x => String(x).padStart(2, '0')).join(':');
+  return days ? `${days}d ${hms}` : hms;
+}
+function updateCountdowns() {
+  document.querySelectorAll('.countdown').forEach(el => {
+    const diff = Number(el.dataset.target) - Date.now(), mode = el.dataset.mode;
+    const label = el.querySelector('.cd-label'), time = el.querySelector('.cd-time');
+    let l;
+    if (mode === 'exit') l = diff > 0 ? t('cdExit') : t('cdExitDone');
+    else l = diff > 0 ? (mode === 'next' ? t('cdNext') : t('cdStart')) : t('cdStarted');
+    if (label.textContent !== l) label.textContent = l;
+    time.textContent = mode === 'exit' && diff <= 0 ? '' : fmtCount(diff);
+    el.classList.toggle('over', diff <= 0);
+  });
 }
 
 function punchBtn(kind, val, label, sub, primary) {
@@ -390,7 +416,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v0.4</p>`;
+    <p class="muted sm center">MEW Shift · v0.5</p>`;
 }
 
 /* ---------- النوافذ (Sheets) ---------- */
@@ -597,6 +623,7 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().
 if (S.settings.group) save();
 render();
 setInterval(() => { tick(); }, 30000);
+setInterval(updateCountdowns, 1000);
 tick();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); tick(); } });
 /* التحديث التلقائي: يفحص عند كل فتح، ويعيد تحميل التطبيق مرة واحدة عند وصول نسخة جديدة */

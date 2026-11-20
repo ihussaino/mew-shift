@@ -155,3 +155,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
 .leave-btn{border:1.5px solid var(--border);background:var(--card);border-radius:14px;min-height:52px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font-size:15px}
 .leave-btn .emo{font-size:20px;line-height:1}
 .shift-card .btn{align-self:flex-start;margin-top:4px}
+
+.countdown{display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(255,255,255,.55);color:#1F1800;border-radius:12px;padding:10px 14px}
+.s-N .countdown{background:rgba(255,255,255,.14);color:#FFFFFF}
+.s-O .countdown{background:var(--soft);color:var(--ink)}
+.cd-label{font-size:14px;font-weight:600}
+.cd-time{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.countdown.over .cd-time{font-size:18px}
+.leave-btn:disabled{opacity:.35;cursor:not-allowed}
