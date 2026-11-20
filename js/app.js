@@ -423,7 +423,7 @@ function renderSettings() {
       <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
-    <p class="muted sm center">MEW Shift · v1.0</p>`;
+    <p class="muted sm center">MEW Shift · v1.1</p>`;
 }
 
 function renderAbout() {
@@ -585,7 +585,9 @@ function doPunch(kind) {
   mutate(date, () => { S.days[date] = Object.assign({}, d, { [kind]: now }, kind === 'att' ? { attMissed: false } : {}); });
   if (kind === 'in') {
     const e = evalEntry(sh, now);
-    if (e.late > 0) sourceSheet(date, 'in', e.late); else toast(`${t('yourExit')} ${fmt12(e.exit)}`);
+    if (e.late > 0) sourceSheet(date, 'in', e.late);
+    else if (e.early) celebrate(`${t('yourExit')} ${fmt12(e.exit)}`);
+    else toast(`${t('yourExit')} ${fmt12(e.exit)}`);
   } else if (kind === 'att') {
     const a = evalAttendance(sh, now);
     if (a.penalty) sourceSheet(date, 'att', a.penalty); else toast(t('attDone'));
@@ -666,6 +668,29 @@ function applyTheme() {
   const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = dark ? '#0D1320' : '#F3F5F9';
 }
 if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.settings.themeMode === 'auto') applyTheme(); });
+
+/* احتفال الدخول المبكر: زينة تنزل من فوق مع رسالة */
+function celebrate(sub) {
+  const old = document.getElementById('celebrate'); if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'celebrate'; wrap.setAttribute('role', 'status');
+  const colors = ['#F6C945', '#F08A24', '#2E46A0', '#00C2C7', '#D7263D', '#3FB168', '#5B9BE0'];
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let pieces = '';
+  if (!reduce) {
+    for (let i = 0; i < 80; i++) {
+      const left = Math.random() * 100, delay = Math.random() * 0.9, dur = 2.2 + Math.random() * 1.6;
+      const w = 6 + Math.random() * 6, h = w * (0.4 + Math.random() * 0.8), rot = Math.random() * 360, drift = (Math.random() * 80 - 40).toFixed(0);
+      const round = Math.random() < 0.25 ? 'border-radius:50%;' : '';
+      pieces += `<i class="confetti" style="left:${left}%;width:${w}px;height:${h}px;background:${colors[i % colors.length]};${round}--rot:${rot}deg;--drift:${drift}px;animation-delay:${delay}s;animation-duration:${dur}s"></i>`;
+    }
+  }
+  wrap.innerHTML = `${pieces}<div class="cheer"><div class="cheer-emoji" aria-hidden="true">🎉</div><b>${t('cheer')}</b><span>${esc(sub)}</span></div>`;
+  wrap.addEventListener('click', () => wrap.remove());
+  document.body.appendChild(wrap);
+  try { if (navigator.vibrate) navigator.vibrate([30, 40, 30]); } catch (e) { /* */ }
+  setTimeout(() => { wrap.classList.add('out'); setTimeout(() => wrap.remove(), 400); }, 4200);
+}
 
 let toastTimer;
 function toast(msg, strong) {
