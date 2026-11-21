@@ -63,18 +63,18 @@ function stable(o) {
 function mergeState(a, b) {
   if (!b) return JSON.parse(JSON.stringify(a));
   const out = {};
-  out.profile = (a.profile && a.profile.u || 0) >= (b.profile && b.profile.u || 0) ? a.profile : b.profile;
+  out.profile = (a.profile && a.profile.u || 0) > (b.profile && b.profile.u || 0) ? a.profile : b.profile;
   out.tomb = Object.assign({}, b.tomb || {});
   Object.entries(a.tomb || {}).forEach(([k, v]) => { out.tomb[k] = Math.max(v, out.tomb[k] || 0); });
   out.days = {};
   new Set([...Object.keys(a.days || {}), ...Object.keys(b.days || {})]).forEach(d => {
     const x = (a.days || {})[d], y = (b.days || {})[d];
-    const w = !y ? x : !x ? y : ((x.u || 0) >= (y.u || 0) ? x : y);
+    const w = !y ? x : !x ? y : ((x.u || 0) > (y.u || 0) ? x : y);
     if (!(out.tomb['day:' + d] >= (w.u || 0))) out.days[d] = w;
   });
   const list = key => {
     const m = new Map();
-    [...(b[key] || []), ...(a[key] || [])].forEach(it => { const p = m.get(it.id); if (!p || (it.u || 0) >= (p.u || 0)) m.set(it.id, it); });
+    [...(a[key] || []), ...(b[key] || [])].forEach(it => { const p = m.get(it.id); if (!p || (it.u || 0) >= (p.u || 0)) m.set(it.id, it); });
     return [...m.values()].filter(it => !(out.tomb[it.id] >= (it.u || 0))).sort((p, q) => (p.date || p.from) < (q.date || q.from) ? -1 : 1);
   };
   out.perms = list('perms'); out.leaves = list('leaves');
@@ -109,11 +109,18 @@ function cloudOnSave() {
   if (Cloud.user) schedulePush();
 }
 
+function stampAll() {
+  const now = Date.now();
+  Object.values(S.days).forEach(v => { v.u = now; });
+  [...S.perms, ...S.leaves].forEach(x => { x.u = now; });
+  S.profileU = now; cloudPrime();
+}
 function startSync(u) {
   stopSync();
   Cloud.status = 'syncing';
   cloudUnsub = FB.onSnapshot(FB.doc(fbDb, 'users', u.uid), snap => {
     remoteState = snap.exists() ? (snap.data().state || null) : null;
+    if (!remoteState && !snap.metadata.fromCache) { stampAll(); saveLocalOnly(); }
     const local = localSyncable(), merged = mergeState(local, remoteState);
     if (stable(merged) !== stable(local)) {
       writeLocal(merged); saveLocalOnly();
@@ -200,6 +207,14 @@ async function googleSignIn() {
   }
 }
 FEATURE_ACTIONS.googleSignIn = () => googleSignIn();
+FEATURE_ACTIONS.useThisDevice = () => openSheet(`<h2>${t('useThisDevice')}</h2><p>${t('useThisDeviceConfirm')}</p>
+  <div class="grid2"><button type="button" class="btn" data-act="closeSheet">${t('cancel')}</button><button type="button" class="btn primary" data-act="useThisDeviceDo">${t('confirm')}</button></div>`);
+FEATURE_ACTIONS.useThisDeviceDo = async () => {
+  if (!Cloud.user) return;
+  stampAll(); saveLocalOnly();
+  remoteState = null; await pushNow();
+  closeSheet(); toast(t('useThisDeviceDone')); render();
+};
 
 function accountCard() {
   if (!cloudEnabled()) return '';
@@ -216,6 +231,7 @@ function accountCard() {
     <div class="row-between"><b>${t('account')}</b><span class="pill ${Cloud.status === 'ok' ? 'ok' : Cloud.status === 'error' ? 'bad' : ''}">${st}</span></div>
     <span dir="ltr" class="account-email">${esc(Cloud.user.email || '')}${Cloud.user.providerData && Cloud.user.providerData.some(p => p.providerId === 'google.com') ? ' · Google' : ''}</span>
     <span class="muted sm">${t('syncWhat')}</span>
+    <button type="button" class="btn" data-act="useThisDevice">${t('useThisDevice')}</button>
     <button type="button" class="btn" data-act="signOut">${t('signOut')}</button>
   </section>`;
 }
