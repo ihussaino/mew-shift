@@ -26,7 +26,7 @@ function loadFirebase() {
   if (Cloud.loading) return Cloud.loading;
   Cloud.loading = new Promise((res, rej) => {
     const s = document.createElement('script');
-    s.src = 'js/firebase.bundle.js?v=1'; s.onload = res; s.onerror = () => { Cloud.loading = null; rej(new Error('load')); };
+    s.src = 'js/firebase.bundle.js?v=2'; s.onload = res; s.onerror = () => { Cloud.loading = null; rej(new Error('load')); };
     document.head.appendChild(s);
   });
   return Cloud.loading;
@@ -39,7 +39,9 @@ async function cloudInit() {
   const app = FB.initializeApp(FIREBASE_CONFIG);
   fbAuth = FB.getAuth(app);
   fbDb = FB.initializeFirestore(app, { localCache: FB.persistentLocalCache() });
+  FB.getRedirectResult(fbAuth).catch(e => toast(authErr(e), true));
   FB.onAuthStateChanged(fbAuth, u => {
+    try { localStorage.removeItem('mewshift.redirect'); } catch (e) { /* */ }
     Cloud.user = u || null;
     if (u) { S.cloudUid = u.uid; startSync(u); } else { S.cloudUid = null; stopSync(); }
     saveLocalOnly(); render();
@@ -145,6 +147,8 @@ function authErr(e) {
   if (c.includes('weak-password')) return t('authWeak');
   if (c.includes('invalid-email')) return t('authBadEmail');
   if (c.includes('network')) return t('authNetwork');
+  if (c.includes('popup-closed') || c.includes('cancelled-popup')) return t('authCancelled');
+  if (c.includes('account-exists-with-different-credential')) return t('authOtherMethod');
   if (c.includes('too-many-requests')) return t('authTooMany');
   return t('authFailed');
 }
@@ -152,6 +156,7 @@ async function openAuth(mode) {
   try { await cloudInit(); } catch (e) { toast(t('authNetwork'), true); return; }
   const title = mode === 'register' ? t('authRegister') : mode === 'reset' ? t('authReset') : t('authLogin');
   openSheet(`<h2>${title}</h2>
+    ${mode === 'reset' ? '' : `${googleBtn()}<div class="or-sep"><span>${t('orEmail')}</span></div>`}
     <p class="muted sm">${mode === 'reset' ? t('authResetHint') : t('authHint')}</p>
     <form class="stack" data-form="auth" data-mode="${mode}">
       <label class="stack sm-gap"><b>${t('email')}</b><input type="email" name="email" class="text-in" autocomplete="email" inputmode="email" dir="ltr" required></label>
@@ -181,19 +186,35 @@ FEATURE_ACTIONS.signOut = async () => {
   toast(t('signedOut'));
 };
 
+function googleBtn() { return `<button type="button" class="btn google-btn" data-act="googleSignIn"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg><span>${t('googleSignIn')}</span></button>`; }
+async function googleSignIn() {
+  try { await cloudInit(); } catch (e) { toast(t('authNetwork'), true); return; }
+  const prov = new FB.GoogleAuthProvider(); prov.setCustomParameters({ prompt: 'select_account' });
+  try { await FB.signInWithPopup(fbAuth, prov); closeSheet(); toast(t('authWelcome')); }
+  catch (e) {
+    const c = (e && e.code) || '';
+    if (c.includes('popup-blocked') || c.includes('operation-not-supported')) {
+      try { localStorage.setItem('mewshift.redirect', '1'); } catch (x) { /* */ }
+      FB.signInWithRedirect(fbAuth, prov).catch(x => toast(authErr(x), true));
+    } else if (!c.includes('popup-closed') && !c.includes('cancelled-popup')) toast(authErr(e), true);
+  }
+}
+FEATURE_ACTIONS.googleSignIn = () => googleSignIn();
+
 function accountCard() {
   if (!cloudEnabled()) return '';
   if (!Cloud.user) {
     return `<section class="card stack account">
       <div class="row-between"><b>${t('account')}</b><span class="pill">${t('free')}</span></div>
       <span class="muted sm">${t('accountWhy')}</span>
+      ${googleBtn()}
       <div class="grid2"><button type="button" class="btn primary" data-act="openAuth" data-v="login">${t('authLogin')}</button><button type="button" class="btn" data-act="openAuth" data-v="register">${t('authRegister')}</button></div>
     </section>`;
   }
   const st = Cloud.status === 'ok' ? `${t('synced')} ✓` : Cloud.status === 'syncing' ? t('syncing') : Cloud.status === 'offline' ? t('syncOffline') : t('syncError');
   return `<section class="card stack account">
     <div class="row-between"><b>${t('account')}</b><span class="pill ${Cloud.status === 'ok' ? 'ok' : Cloud.status === 'error' ? 'bad' : ''}">${st}</span></div>
-    <span dir="ltr" class="account-email">${esc(Cloud.user.email || '')}</span>
+    <span dir="ltr" class="account-email">${esc(Cloud.user.email || '')}${Cloud.user.providerData && Cloud.user.providerData.some(p => p.providerId === 'google.com') ? ' · Google' : ''}</span>
     <span class="muted sm">${t('syncWhat')}</span>
     <button type="button" class="btn" data-act="signOut">${t('signOut')}</button>
   </section>`;

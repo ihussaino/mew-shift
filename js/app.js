@@ -255,7 +255,7 @@ function renderOnboarding() {
       <label class="stack sm-gap"><b>${t('yourName')}</b><input type="text" class="text-in big-in" data-act="obName" value="${esc(obName)}" maxlength="30" autocomplete="given-name" placeholder="${t('namePlaceholder')}"></label>
       <div class="privacy-note">${ICONS.lock}<span>${t('privacyNote')}</span></div>
       <button type="button" class="btn primary ob-next" data-act="obNext"${obName.trim() ? '' : ' disabled'}>${t('next')}</button>
-      ${cloudEnabled() ? `<button type="button" class="link center" data-act="openAuth" data-v="login">${t('haveAccountLogin')}</button>` : ''}`;
+      ${cloudEnabled() ? `<div class="or-sep"><span>${t('haveAccountLogin')}</span></div>${googleBtn()}<button type="button" class="link center" data-act="openAuth" data-v="login">${t('emailLogin')}</button>` : ''}`;
   } else if (obStep === 2) {
     const today = todayISO();
     const preview = obGroup ? (() => { const sh = shiftOf(obGroup, today), tm = shiftOf(obGroup, addDays(today, 1)); return `<div class="ob-preview"><span>${t('today')}: <b>${shiftName(sh)}</b></span><span>${t('tomorrow')}: <b>${shiftName(tm)}</b></span></div>`; })() : '';
@@ -1046,7 +1046,7 @@ render();
 fetchAnnouncements();
 if (S.push) syncPush();
 cloudPrime();
-if (cloudEnabled() && S.cloudUid) cloudInit().catch(() => {});
+if (cloudEnabled() && (S.cloudUid || (() => { try { return localStorage.getItem('mewshift.redirect'); } catch (e) { return null; } })())) cloudInit().catch(() => {});
 setInterval(() => { tick(); }, 30000);
 setInterval(updateCountdowns, 1000);
 tick();

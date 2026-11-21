@@ -391,3 +391,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
 .perm-preview.ok{background:var(--ok-bg);color:var(--ok-ink)}
 .perm-preview.bad{background:var(--warn-bg);color:var(--warn)}
 div.punch{cursor:default}
+
+/* زر Google والفاصل */
+.google-btn{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:1px solid #dadce0}
+.google-btn:hover{background:#f7f8fa}
+.or-sep{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.or-sep::before,.or-sep::after{content:"";flex:1;height:1px;background:var(--line,rgba(127,127,127,.25))}
