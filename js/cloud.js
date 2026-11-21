@@ -6,7 +6,14 @@
 'use strict';
 
 /* إعدادات مشروع Firebase (ليست سرية). null = الحسابات غير مفعّلة بعد */
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyDadEnrWt9JmG0E5kCetFyTsX52aXO6hzc',
+  authDomain: 'mew-shift.firebaseapp.com',
+  projectId: 'mew-shift',
+  storageBucket: 'mew-shift.firebasestorage.app',
+  messagingSenderId: '108458000267',
+  appId: '1:108458000267:web:01a3b033320d120842398e'
+};
 
 const Cloud = { user: null, status: 'off', lastSync: 0, loading: null };
 let fbAuth = null, fbDb = null, cloudUnsub = null, remoteState = null, pushTimer = null;
