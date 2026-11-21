@@ -87,12 +87,41 @@ function activeDate() {
 /* الدقائق الحالية منسوبة ليوم الشفت (لشفت الليل بعد منتصف الليل) */
 function nowRel(date) { return nowMin() + (date !== todayISO() ? 1440 : 0); }
 
+/* ---------- الاستئذانات: دخول، أثناء الدوام، انصراف ---------- */
+function permsOn(date) { return S.perms.filter(p => p.date === date); }
+function arrivalPerm(date) { return permsOn(date).find(p => p.kind === 'in') || null; }
+function leavePerm(date) { return permsOn(date).find(p => p.kind === 'out') || null; }
+/* إذن دخول يمتد بعد نافذة التواجد = لا تُطلب بصمة التواجد */
+function attExempt(date) {
+  const sh = shiftOf(group(), date), p = arrivalPerm(date);
+  return !!p && isWorkShift(sh) && deltaFromStart(sh, parseHM(p.to)) > RULES.attOffsetEnd;
+}
+/* وقت الانصراف المحسوب لليوم (2:30 إذا بصم مبكراً، وإلا نهاية الدوام) بالدقائق المنسوبة لبداية يوم الشفت */
+function exitRelOf(date) {
+  const sh = shiftOf(group(), date), d = S.days[date] || {};
+  if (!isWorkShift(sh)) return null;
+  if (arrivalPerm(date)) return RULES.shifts[sh].end;
+  return d.in ? evalEntry(sh, d.in).exit : RULES.shifts[sh].end;
+}
+/* مدة الاستئذان بالدقائق حسب نوعه */
+function permMinutes(kind, date, a, b) {
+  const sh = shiftOf(group(), date);
+  if (!isWorkShift(sh)) return 0;
+  const start = RULES.shifts[sh].start, rel = x => start + deltaFromStart(sh, parseHM(x));
+  if (kind === 'in') return a ? rel(a) - start : 0;
+  if (kind === 'out') return a ? exitRelOf(date) - rel(a) : 0;
+  if (kind === 'mid') return a && b ? rel(b) - rel(a) : 0;
+  return 0;
+}
+
 function dayDeductions(date) {
   const d = S.days[date], sh = shiftOf(group(), date), res = [];
   if (!d || !isWorkShift(sh)) return res;
-  if (d.in) { const e = evalEntry(sh, d.in); if (e && e.late > 0) res.push({ kind: 'late', minutes: e.late, src: d.inSrc || 'late' }); }
-  if (d.att) { const a = evalAttendance(sh, d.att); if (a.penalty) res.push({ kind: 'att', minutes: a.penalty, src: d.attSrc || 'late' }); }
-  else if (d.attMissed) res.push({ kind: 'att', minutes: RULES.attPenalty, src: d.attSrc || 'late' });
+  if (d.in && !arrivalPerm(date)) { const e = evalEntry(sh, d.in); if (e && e.late > 0) res.push({ kind: 'late', minutes: e.late, src: d.inSrc || 'late' }); }
+  if (!attExempt(date)) {
+    if (d.att) { const a = evalAttendance(sh, d.att); if (a.penalty) res.push({ kind: 'att', minutes: a.penalty, src: d.attSrc || 'late' }); }
+    else if (d.attMissed) res.push({ kind: 'att', minutes: RULES.attPenalty, src: d.attSrc || 'late' });
+  }
   return res;
 }
 
@@ -276,28 +305,32 @@ function renderToday() {
     const e = d.in ? evalEntry(sh, d.in) : null;
     const win = attWindow(sh);
     const nr = nowRel(date);
+    const exempt = attExempt(date), outP = leavePerm(date);
     const status = e
-      ? `<div class="shift-info"><span>${t('punchedIn')} ${fmtHM(d.in)}</span><b>${t('yourExit')} ${fmt12(e.exit)}</b></div>${e.late ? `<div class="shift-info warn-row">${t('lateBy')} ${e.late} ${t('minutes')} — ${t('from_' + (d.inSrc || 'late'))}</div>` : ''}`
+      ? `<div class="shift-info"><span>${t('punchedIn')} ${fmtHM(d.in)}</span><b>${t('yourExit')} ${outP ? fmtHM(outP.from) + ' (' + t('permShort') + ')' : fmt12(exitRelOf(date))}</b></div>${e.late && !arrivalPerm(date) ? `<div class="shift-info warn-row">${t('lateBy')} ${e.late} ${t('minutes')} — ${t('from_' + (d.inSrc || 'late'))}</div>` : ''}`
       : `<div class="shift-info"><span>${t('pressAfterPunch')}</span></div>`;
     main += `
       <section class="shift-card s-${sh}${hol ? ' has-hol' : ''}">
         <div class="row-between"><span class="label">${date !== todayISO() ? t('yesterdayShift') : t('todayShift')}</span>${hol ? `<span class="hol-tag">${esc(hol[S.settings.lang] || hol.ar)}</span>` : ''}</div>
         <div class="shift-head">
           <div class="stack sm-gap"><div class="shift-name">${shiftName(sh)}</div><div class="shift-hours">${shiftHours(sh)}</div></div>
-          ${d.out ? '' : shiftRing(tsOf(date, RULES.shifts[sh].start), tsOf(date, e ? e.exit : RULES.shifts[sh].end))}
+          ${d.out ? '' : shiftRing(tsOf(date, RULES.shifts[sh].start), tsOf(date, outP ? RULES.shifts[sh].start + deltaFromStart(sh, parseHM(outP.from)) : exitRelOf(date)))}
         </div>
         ${status}
       </section>
+      <div class="punch-head"><button type="button" class="edit-link" data-act="editPunches" data-v="${date}">${ICONS.pencil}<span>${t('edit')}</span></button></div>
       <div class="grid3">
-        ${punchBtn('in', d.in, t('btnIn'), e ? '' : fmt12(RULES.shifts[sh].start))}
-        ${punchBtn('att', d.att, t('btnAtt'), d.attMissed ? t('forgot') : `${fmtPlain(win.from)} – ${fmtPlain(win.to)}`, !d.att && !d.attMissed && d.in, !d.att && !d.attMissed && nr < win.from ? tsOf(date, win.from) : 0)}
-        ${punchBtn('out', d.out, t('btnOut'), e ? fmt12(e.exit) : '')}
+        ${punchBtn('in', d.in, t('btnIn'), arrivalPerm(date) ? `${t('permShort')} ${fmtHM(arrivalPerm(date).to)}` : e ? '' : fmt12(RULES.shifts[sh].start))}
+        ${exempt ? `<div class="punch done k-att" aria-disabled="true">${ICONS.check}<b>${t('btnAtt')}</b><span>${t('attExempt')}</span></div>`
+          : punchBtn('att', d.att, t('btnAtt'), d.attMissed ? t('forgot') : `${fmtPlain(win.from)} – ${fmtPlain(win.to)}`, !d.att && !d.attMissed && d.in, !d.att && !d.attMissed && nr < win.from ? tsOf(date, win.from) : 0)}
+        ${outP && !d.out ? `<div class="punch done k-out" aria-disabled="true">${ICONS.out}<b>${t('btnOut')}</b><span>${t('permShort')} ${fmtHM(outP.from)}</span></div>` : punchBtn('out', d.out, t('btnOut'), fmt12(exitRelOf(date)))}
       </div>
       <div class="grid2">
         <button type="button" class="leave-btn" data-act="quickLeave" data-v="sick"${d.in ? ' disabled' : ''}><span class="emo" aria-hidden="true">🏥</span><b>${t('btnSick')}</b></button>
         <button type="button" class="leave-btn" data-act="quickLeave" data-v="emergency"${d.in ? ' disabled' : ''}><span class="emo" aria-hidden="true">🚨</span><b>${t('btnEmergency')}</b></button>
-      </div>`;
-    if (d.in && !d.att && !d.attMissed && nr > win.to) {
+      </div>
+      <button type="button" class="leave-btn perm-btn" data-act="openPerm" data-v="${date}"><span class="emo" aria-hidden="true">🚪</span><b>${t('btnPerm')}</b>${permsOn(date).length ? `<span class="pill">${permsOn(date).length}</span>` : ''}</button>`;
+    if (d.in && !d.att && !d.attMissed && !exempt && nr > win.to) {
       main += `<section class="card alert stack"><b>${t('attMissedQ')}</b><div class="grid2">
         <button type="button" class="btn" data-act="editDay" data-v="${date}">${t('enterTime')}</button>
         <button type="button" class="btn danger" data-act="forgotAtt" data-v="${date}">${t('forgotDeduct')}</button></div></section>`;
@@ -616,7 +649,7 @@ function srcSelect(name, cur) {
   return `<select name="${name}" class="sel"><option value="late"${cur !== 'perm' ? ' selected' : ''}>${t('from_late')}</option><option value="perm"${cur === 'perm' ? ' selected' : ''}>${t('from_perm')}</option></select>`;
 }
 
-function daySheet(date) {
+function daySheet(date, onlyPunches) {
   const sh = shiftOf(group(), date), d = S.days[date] || {}, hol = holidayOn(date);
   const perms = S.perms.filter(p => p.date === date);
   const leaves = S.leaves.filter(l => date >= l.from && date <= l.to);
@@ -624,10 +657,10 @@ function daySheet(date) {
     <span class="muted">${shiftHours(sh)}${hol ? ' · ' + esc(hol[S.settings.lang] || hol.ar) : ''}</span>`;
   if (isWorkShift(sh)) {
     const e = d.in ? evalEntry(sh, d.in) : null, a = d.att ? evalAttendance(sh, d.att) : null;
-    body += `<form class="stack" data-form="punches" data-date="${date}">
+    body += `<form class="stack" data-form="punches" data-date="${date}" data-only="${onlyPunches ? 1 : 0}">
       <h3>${t('punches')}</h3>
       <label class="row-between">${t('btnIn')}<input type="time" name="in" value="${esc(d.in || '')}" class="time"></label>
-      ${e && e.late ? `<label class="row-between sm">${t('lateBy')} ${e.late} ${t('minutes')}${srcSelect('inSrc', d.inSrc)}</label>` : ''}
+      ${e && e.late && !arrivalPerm(date) ? `<label class="row-between sm">${t('lateBy')} ${e.late} ${t('minutes')}${srcSelect('inSrc', d.inSrc)}</label>` : ''}
       <label class="row-between">${t('btnAtt')}<input type="time" name="att" value="${esc(d.att || '')}" class="time"></label>
       <label class="row-between sm"><span>${t('forgotAtt')}</span><input type="checkbox" name="attMissed"${d.attMissed ? ' checked' : ''} class="chk"></label>
       ${(a && a.penalty) || d.attMissed ? `<label class="row-between sm">${t('attPenalty')}${srcSelect('attSrc', d.attSrc)}</label>` : ''}
@@ -636,12 +669,13 @@ function daySheet(date) {
       <button type="submit" class="btn primary">${t('save')}</button>
     </form>`;
   }
+  if (onlyPunches) { openSheet(body); return; }
   body += `<form class="stack" data-form="perm" data-date="${date}">
       <h3>${t('addPerm')}</h3>
       <div class="row-between"><label class="inline">${t('hours')}<input type="number" name="h" min="0" max="12" value="0" class="num"></label>
       <label class="inline">${t('minutes')}<input type="number" name="m" min="0" max="59" value="0" class="num"></label>
       <button type="submit" class="btn">${t('add')}</button></div>
-      ${perms.map(p => `<div class="row-between list-row"><span>${t('perm')} ${fmtDur(p.minutes)}</span><button type="button" class="link danger-t" data-act="delPerm" data-v="${p.id}">${t('delete')}</button></div>`).join('')}
+      ${perms.map(p => `<div class="row-between list-row"><span>${permLabel(p)}</span><button type="button" class="link danger-t" data-act="delPerm" data-v="${p.id}">${t('delete')}</button></div>`).join('')}
     </form>
     <form class="stack" data-form="leave">
       <h3>${t('addLeave')}</h3>
@@ -654,6 +688,72 @@ function daySheet(date) {
     </form>`;
   openSheet(body);
 }
+
+/* ---------- نافذة الاستئذان ---------- */
+let permKindSel = 'out';
+function permLabel(p) {
+  if (!p.kind) return `${t('perm')} ${fmtDur(p.minutes)}`;
+  const times = p.kind === 'mid' ? `${fmtHM(p.from)} – ${fmtHM(p.to)}` : p.kind === 'in' ? `${t('until')} ${fmtHM(p.to)}` : `${t('fromTime')} ${fmtHM(p.from)}`;
+  return `${t('permKind_' + p.kind)} · ${times} · ${fmtDur(p.minutes)}`;
+}
+function permBalance(date) {
+  const u = monthUsage(date.slice(0, 7));
+  return { min: Math.max(0, RULES.monthlyPermMinutes - u.perm), times: Math.max(0, RULES.monthlyPermTimes - u.permTimes) };
+}
+function permSheet(date, kind) {
+  const sh = shiftOf(group(), date), bal = permBalance(date), now = hm(nowMin());
+  const sel = (k) => `<button type="button" class="${kind === k ? 'on' : ''}" data-act="permKind" data-v="${k}" data-date="${date}">${t('permKind_' + k)}</button>`;
+  const later = hm(nowMin() + 60);
+  const fields = kind === 'in'
+    ? `<label class="row-between">${t('arriveAt')}<input type="time" class="time" data-perm="a" value="${now}"></label>`
+    : kind === 'mid'
+      ? `<label class="row-between">${t('leaveAt')}<input type="time" class="time" data-perm="a" value="${now}"></label><label class="row-between">${t('backAt')}<input type="time" class="time" data-perm="b" value="${later}"></label>`
+      : `<label class="row-between">${t('leaveAt')}<input type="time" class="time" data-perm="a" value="${now}"></label><span class="muted sm">${t('yourExit')} ${fmt12(exitRelOf(date))}</span>`;
+  const list = permsOn(date);
+  openSheet(`<div class="row-between"><h2>🚪 ${t('btnPerm')}</h2><span class="pill s-${sh}">${shiftName(sh)}</span></div>
+    <div class="perm-bal"><span>${t('permBalanceNow')}</span><b>${fmtDur(bal.min)} ${t('of')} 12 ${t('hShort')}</b><span class="muted sm">${t('timesLeft')} ${bal.times} ${t('of')} 4</span></div>
+    <div class="seg" role="group">${sel('in')}${sel('mid')}${sel('out')}</div>
+    <form class="stack" data-form="permNew" data-date="${date}" data-kind="${kind}">
+      ${fields}
+      <div class="perm-preview" id="perm-preview" aria-live="polite"></div>
+      <button type="submit" class="btn primary" id="perm-ok">${t('permConfirm')}</button>
+    </form>
+    ${list.length ? `<section class="card stack"><b>${t('permToday')}</b>${list.map(p => `<div class="row-between list-row"><span class="sm">${permLabel(p)}</span><button type="button" class="link danger-t" data-act="delPermToday" data-v="${p.id}">${t('delete')}</button></div>`).join('')}</section>` : ''}`);
+  updatePermPreview();
+}
+function permCheck(date, kind, a, b) {
+  const bal = permBalance(date), min = permMinutes(kind, date, a, b);
+  if (!a || (kind === 'mid' && !b) || min <= 0) return { ok: false, min, err: t('permErrInvalid') };
+  /* الأوقات لازم تكون داخل الدوام */
+  const sh = shiftOf(group(), date), start = RULES.shifts[sh].start, end = exitRelOf(date);
+  const rel = x => start + deltaFromStart(sh, parseHM(x));
+  if (rel(a) < start || rel(a) > end || (b && (rel(b) > end || rel(b) < start))) return { ok: false, min, err: t('permErrOutside') };
+  if (permsOn(date).some(p => p.kind === kind && kind !== 'mid')) return { ok: false, min, err: t('permExists') };
+  if (bal.times <= 0) return { ok: false, min, err: t('permErrTimes') };
+  if (min > bal.min) return { ok: false, min, err: `${t('permErrBalance')} (${fmtDur(bal.min)})` };
+  return { ok: true, min, left: bal.min - min };
+}
+function updatePermPreview() {
+  const f = document.querySelector('form[data-form="permNew"]'); if (!f) return;
+  const a = (f.querySelector('[data-perm="a"]') || {}).value, b = (f.querySelector('[data-perm="b"]') || {}).value;
+  const r = permCheck(f.dataset.date, f.dataset.kind, a, b);
+  const box = document.getElementById('perm-preview'), btn = document.getElementById('perm-ok');
+  box.className = 'perm-preview ' + (r.ok ? 'ok' : 'bad');
+  box.textContent = r.ok ? `${t('willDeduct')} ${fmtDur(r.min)} · ${t('remainAfter')} ${fmtDur(r.left)}` : r.err;
+  btn.disabled = !r.ok;
+}
+FEATURE_SUBMIT.permNew = (f) => {
+  const date = f.dataset.date, kind = f.dataset.kind;
+  const a = (f.querySelector('[data-perm="a"]') || {}).value, b = (f.querySelector('[data-perm="b"]') || {}).value;
+  const r = permCheck(date, kind, a, b);
+  if (!r.ok) { updatePermPreview(); return; }
+  const rec = { id: uid(), date, minutes: r.min, kind };
+  if (kind === 'in') { rec.from = hm(RULES.shifts[shiftOf(group(), date)].start); rec.to = a; }
+  else if (kind === 'out') { rec.from = a; rec.to = hm(exitRelOf(date)); }
+  else { rec.from = a; rec.to = b; }
+  mutate(date, () => { S.perms.push(rec); });
+  closeSheet(); toast(`${t('permAdded')} · ${fmtDur(r.min)}`);
+};
 
 function sourceSheet(date, which, minutes) {
   openSheet(`<h2>${which === 'in' ? t('lateTitle') : t('attPenaltyTitle')}</h2>
@@ -703,6 +803,10 @@ document.addEventListener('click', ev => {
     case 'quickLeave': quickLeave(v); break;
     case 'cancelLeave': openSheet(`<h2>${t('cancelLeave')}</h2><p>${t('cancelLeaveQ')}</p><div class="grid2"><button type="button" class="btn" data-act="closeSheet">${t('cancel')}</button><button type="button" class="btn danger" data-act="cancelLeaveDo" data-v="${v}">${t('cancelLeave')}</button></div>`); break;
     case 'cancelLeaveDo': S.leaves = S.leaves.filter(x => x.id !== v); save(); closeSheet(); render(); toast(t('leaveCancelled')); break;
+    case 'editPunches': daySheet(v, true); break;
+    case 'openPerm': permSheet(v, permKindSel); break;
+    case 'permKind': permKindSel = v; permSheet(el.dataset.date, v); break;
+    case 'delPermToday': { S.perms = S.perms.filter(x => x.id !== v); save(); render(); permSheet(activeDate(), permKindSel); break; }
     case 'closeSheet': closeSheet(); break;
     default: if (FEATURE_ACTIONS[act]) FEATURE_ACTIONS[act](v, el); break;
     case 'resetAsk': openSheet(`<h2>${t('resetAll')}</h2><p>${t('resetConfirm')}</p><div class="grid2"><button type="button" class="btn" data-act="closeSheet">${t('cancel')}</button><button type="button" class="btn danger" data-act="resetDo">${t('delete')}</button></div>`); break;
@@ -712,6 +816,7 @@ document.addEventListener('click', ev => {
 
 document.addEventListener('input', ev => {
   const el = ev.target;
+  if (el.dataset && el.dataset.perm) { updatePermPreview(); return; }
   if (el.dataset && el.dataset.act === 'obName') {
     obName = el.value;
     const btn = document.querySelector('[data-act="obNext"]');
@@ -746,7 +851,7 @@ document.addEventListener('submit', ev => {
         inSrc: fd.get('inSrc') || prev.inSrc || 'late', attSrc: fd.get('attSrc') || prev.attSrc || 'late'
       });
     });
-    toast(t('saved')); daySheet(date);
+    toast(t('saved')); daySheet(date, f.dataset.only === '1');
   } else if (f.dataset.form === 'perm') {
     const date = f.dataset.date, min = Number(fd.get('h') || 0) * 60 + Number(fd.get('m') || 0);
     if (min <= 0) return;
@@ -773,12 +878,12 @@ function doPunch(kind) {
   const date = activeDate(), sh = shiftOf(group(), date);
   if (!isWorkShift(sh)) return;
   const d = S.days[date] || {};
-  if (d[kind]) { daySheet(date); return; }
+  if (d[kind]) return;
   const now = hm(nowMin());
   mutate(date, () => { S.days[date] = Object.assign({}, d, { [kind]: now }, kind === 'att' ? { attMissed: false } : {}); });
   if (kind === 'in') {
     const e = evalEntry(sh, now);
-    if (e.late > 0) sourceSheet(date, 'in', e.late);
+    if (e.late > 0 && !arrivalPerm(date)) sourceSheet(date, 'in', e.late);
     else if (e.early) celebrate(`${t('yourExit')} ${fmt12(e.exit)}`);
     else toast(`${t('yourExit')} ${fmt12(e.exit)}`);
   } else if (kind === 'att') {
@@ -825,7 +930,8 @@ async function syncPush() {
     S.leaves.forEach(l => { for (let d = l.from; d <= l.to && d <= end; d = addDays(d, 1)) if (d >= addDays(td, -1)) skip.push(d); });
     const date = activeDate(), sh = shiftOf(group(), date), dd = S.days[date] || {};
     let exitAt = null;
-    if (isWorkShift(sh) && dd.in && !dd.out) { const e = evalEntry(sh, dd.in); const at = tsOf(date, e.exit); if (at > Date.now()) exitAt = new Date(at).toISOString().slice(0, 16); }
+    if (attExempt(date)) skip.push(date);
+    if (isWorkShift(sh) && dd.in && !dd.out && !leavePerm(date)) { const e = evalEntry(sh, dd.in); const at = tsOf(date, e.exit); if (at > Date.now()) exitAt = new Date(at).toISOString().slice(0, 16); }
     await fetch(PUSH_API + '/sync', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subscription: sub.toJSON(), group: group(), lang: S.settings.lang, att: S.settings.notify.att, exit: S.settings.notify.exit, skip, exitAt })
@@ -843,10 +949,10 @@ function tick() {
   if (!isWorkShift(sh) || leaveOn(date)) return;
   const nr = nowRel(date), win = attWindow(sh);
   const k1 = date + 'att';
-  if (S.settings.notify.att && !d.att && !notified.has(k1) && nr >= win.from && nr <= win.to) {
+  if (S.settings.notify.att && !d.att && !attExempt(date) && !notified.has(k1) && nr >= win.from && nr <= win.to) {
     notified.add(k1); if (!S.push) notify(t('attNow')); toast(t('attNow'), true);
   }
-  if (S.settings.notify.exit && d.in && !d.out) {
+  if (S.settings.notify.exit && d.in && !d.out && !leavePerm(date)) {
     const e = evalEntry(sh, d.in), k2 = date + 'exit';
     const exitRel = e.exit; // منسوب لبداية يوم الشفت
     if (!notified.has(k2) && nr >= exitRel && nr <= exitRel + 30) { notified.add(k2); if (!S.push) notify(t('exitNow')); toast(t('exitNow'), true); }
@@ -920,6 +1026,7 @@ const ICONS = {
   bell: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'
