@@ -216,6 +216,7 @@ function render() {
   $app().innerHTML = html;
   renderNav();
   updateCountdowns();
+  if (onboarding || view === 'settings') setTimeout(cloudWarm, 0);
 }
 
 function renderNav() {
