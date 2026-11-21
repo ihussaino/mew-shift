@@ -27,7 +27,8 @@ function load() {
     if (raw && typeof raw === 'object') {
       return {
         settings: Object.assign({}, DEFAULT.settings, raw.settings, { notify: Object.assign({}, DEFAULT.settings.notify, raw.settings && raw.settings.notify) }),
-        days: raw.days || {}, perms: raw.perms || [], leaves: raw.leaves || [], push: raw.push || null
+        days: raw.days || {}, perms: raw.perms || [], leaves: raw.leaves || [], push: raw.push || null,
+        tomb: raw.tomb || {}, profileU: raw.profileU || 0, cloudUid: raw.cloudUid || null
       };
     }
   } catch (e) { /* تجاهل */ }
@@ -43,8 +44,12 @@ function readCookie() {
     return m ? JSON.parse(decodeURIComponent(m[1])) : null;
   } catch (e) { return null; }
 }
-function save() {
+function saveLocalOnly() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* التخزين غير متاح */ }
+}
+function save() {
+  if (typeof cloudOnSave === 'function') cloudOnSave();
+  saveLocalOnly();
   if (S.push) { clearTimeout(save._t); save._t = setTimeout(syncPush, 1500); }
   try { document.cookie = 'mewshift=' + encodeURIComponent(JSON.stringify(S.settings)) + '; max-age=31536000; path=/; SameSite=Lax'; } catch (e) { /* */ }
 }
@@ -249,7 +254,8 @@ function renderOnboarding() {
       <div class="stack sm-gap ob-title"><h1>${t('obHello')} 👋</h1><p class="muted">${t('obNameQ')}</p></div>
       <label class="stack sm-gap"><b>${t('yourName')}</b><input type="text" class="text-in big-in" data-act="obName" value="${esc(obName)}" maxlength="30" autocomplete="given-name" placeholder="${t('namePlaceholder')}"></label>
       <div class="privacy-note">${ICONS.lock}<span>${t('privacyNote')}</span></div>
-      <button type="button" class="btn primary ob-next" data-act="obNext"${obName.trim() ? '' : ' disabled'}>${t('next')}</button>`;
+      <button type="button" class="btn primary ob-next" data-act="obNext"${obName.trim() ? '' : ' disabled'}>${t('next')}</button>
+      ${cloudEnabled() ? `<button type="button" class="link center" data-act="openAuth" data-v="login">${t('haveAccountLogin')}</button>` : ''}`;
   } else if (obStep === 2) {
     const today = todayISO();
     const preview = obGroup ? (() => { const sh = shiftOf(obGroup, today), tm = shiftOf(obGroup, addDays(today, 1)); return `<div class="ob-preview"><span>${t('today')}: <b>${shiftName(sh)}</b></span><span>${t('tomorrow')}: <b>${shiftName(tm)}</b></span></div>`; })() : '';
@@ -595,8 +601,9 @@ function renderSettings() {
       <span class="sm">${t('proDesc')}</span>
       <div class="grid2"><div class="price">${t('monthly')}<b>$1.99</b></div><div class="price">${t('yearly')}<b>$19.99</b></div></div>
     </section>
+    ${accountCard()}
     <section class="card stack">
-      <b>${t('data')}</b><span class="muted sm">${t('dataNote')}</span>
+      <b>${t('data')}</b><span class="muted sm">${Cloud.user ? t('dataNoteCloud') : t('dataNote')}</span>
       <button type="button" class="btn danger" data-act="resetAsk">${t('resetAll')}</button>
     </section>
     </div>
@@ -810,7 +817,7 @@ document.addEventListener('click', ev => {
     case 'closeSheet': closeSheet(); break;
     default: if (FEATURE_ACTIONS[act]) FEATURE_ACTIONS[act](v, el); break;
     case 'resetAsk': openSheet(`<h2>${t('resetAll')}</h2><p>${t('resetConfirm')}</p><div class="grid2"><button type="button" class="btn" data-act="closeSheet">${t('cancel')}</button><button type="button" class="btn danger" data-act="resetDo">${t('delete')}</button></div>`); break;
-    case 'resetDo': S = JSON.parse(JSON.stringify(DEFAULT)); save(); closeSheet(); view = 'today'; render(); break;
+    case 'resetDo': if (Cloud.user) { stopSync(); FB.signOut(fbAuth).catch(() => {}); } S = JSON.parse(JSON.stringify(DEFAULT)); cloudPrime(); saveLocalOnly(); closeSheet(); view = 'today'; render(); break;
   }
 });
 
@@ -1038,6 +1045,8 @@ if (S.settings.group) save();
 render();
 fetchAnnouncements();
 if (S.push) syncPush();
+cloudPrime();
+if (cloudEnabled() && S.cloudUid) cloudInit().catch(() => {});
 setInterval(() => { tick(); }, 30000);
 setInterval(updateCountdowns, 1000);
 tick();
