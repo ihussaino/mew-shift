@@ -264,8 +264,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2.5px soli
   .cell{height:74px;font-size:18px}
   .cal{padding:18px}
   .cal-cols .legend{flex-direction:column;gap:10px;font-size:14px}
-  .settings-grid{display:block;columns:2;column-gap:20px}
-  .settings-grid>section{break-inside:avoid;margin-bottom:20px}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .settings-grid>section{min-width:0}
   .about{max-width:620px;margin:0 auto;width:100%}
   .shift-name{font-size:40px}
   .cd-time{font-size:32px}
