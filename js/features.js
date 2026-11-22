@@ -34,14 +34,34 @@ function leaveCalc(from, to) {
   const overlap = S.leaves.some(l => !(to < l.from || from > l.to));
   return { total, cost, free: total - cost, fridays, hols: [...hols.values()], overlap };
 }
+let calcMonth = null;
+function rangePicker() {
+  const today = todayISO(), g = group();
+  if (!calcMonth) calcMonth = (calcFrom || today).slice(0, 7) + '-01';
+  const [y, m] = calcMonth.split('-').map(Number);
+  const first = calcMonth, n = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  let cells = '';
+  for (let i = 0; i < weekday(first); i++) cells += '<span></span>';
+  for (let i = 0; i < n; i++) {
+    const d = addDays(first, i), sh = shiftOf(g, d), booked = !!leaveOn(d), red = isFriday(d) || !!holidayOn(d);
+    const end = calcTo || calcFrom;
+    const cls = ['rp-day', red ? 'red' : '', booked ? 'booked' : '', d < today ? 'past' : '',
+      calcFrom && d >= calcFrom && d <= end ? 'in' : '', d === calcFrom ? 'start' : '', d === end ? 'end' : ''].filter(Boolean).join(' ');
+    cells += `<button type="button" class="${cls}" data-act="calcPick" data-v="${d}"${booked ? ' disabled' : ''}><b>${i + 1}</b><i class="rp-shift s-${sh}"></i></button>`;
+  }
+  return `<section class="card rp">
+    <div class="row-between rp-nav"><button type="button" class="icon-btn" data-act="calcMonth" data-v="-1" aria-label="${t('prevMonth')}">${S.settings.lang === 'ar' ? ICONS.right : ICONS.left}</button><b>${monthName(m)} ${y}</b><button type="button" class="icon-btn" data-act="calcMonth" data-v="1" aria-label="${t('nextMonth')}">${S.settings.lang === 'ar' ? ICONS.left : ICONS.right}</button></div>
+    <div class="rp-grid head">${t('weekdaysShort').split(',').map(w => `<span>${w}</span>`).join('')}</div>
+    <div class="rp-grid">${cells}</div>
+    <div class="rp-hint muted sm">${!calcFrom ? t('pickStart') : !calcTo ? t('pickEnd') : `${fmtShort(calcFrom)} ← ${fmtShort(calcTo)}`}</div>
+  </section>`;
+}
 function plannerSheet() {
   const ar = annualRemaining();
-  const today = todayISO();
-  if (!calcFrom) { calcFrom = addDays(today, 1); calcTo = addDays(today, 7); }
   let out = '';
-  if (calcTo < calcFrom) out = `<div class="perm-preview bad">${t('calcBadRange')}</div>`;
-  else {
-    const r = leaveCalc(calcFrom, calcTo), after = ar == null ? null : ar - r.cost;
+  if (calcFrom) {
+    const to = calcTo || calcFrom;
+    const r = leaveCalc(calcFrom, to), after = ar == null ? null : ar - r.cost;
     const freeList = [
       ...r.fridays.map(d => `<li>${fmtShort(d)} · ${t('friday')}</li>`),
       ...r.hols.map(x => `<li>${x.days.length > 1 ? fmtShort(x.days[0]) + ' – ' + fmtShort(x.days[x.days.length - 1]) : fmtShort(x.days[0])} · ${esc(x.h[S.settings.lang] || x.h.ar)}${x.days.length > 1 ? ' (' + daysCount(x.days.length) + ')' : ''}</li>`)
@@ -59,27 +79,33 @@ function plannerSheet() {
   }
   openSheet(`<h2>🧮 ${t('calcTitle')}</h2>
     <p class="muted sm">${t('calcIntro')}</p>
-    <form class="stack" data-form="planner">
-      <div class="grid2"><label class="stack sm-gap sm">${t('fromDate')}<input type="date" name="from" value="${calcFrom}" class="time" required></label>
-      <label class="stack sm-gap sm">${t('toDate')}<input type="date" name="to" value="${calcTo}" class="time" required></label></div>
-      ${ar != null ? `<span class="muted sm">${t('balance')}: ${daysCount(ar)}</span>` : ''}
-      <button type="submit" class="btn">${t('calcGo')}</button>
-    </form>
+    ${rangePicker()}
+    ${ar != null ? `<span class="muted sm">${t('balance')}: ${daysCount(ar)}</span>` : ''}
     ${out}`);
 }
-FEATURE_ACTIONS.openCalc = () => plannerSheet();
-FEATURE_SUBMIT.planner = (f, fd) => {
-  calcFrom = String(fd.get('from') || calcFrom); calcTo = String(fd.get('to') || calcTo);
+FEATURE_ACTIONS.openCalc = () => { calcFrom = calcTo = calcMonth = null; plannerSheet(); };
+FEATURE_ACTIONS.calcPick = d => {
+  if (!calcFrom || calcTo || d < calcFrom) { calcFrom = d; calcTo = null; }
+  else {
+    const hit = S.leaves.some(l => !(d < l.from || calcFrom > l.to));
+    if (hit) { toast(t('calcOverlap'), true); return; }
+    calcTo = d;
+  }
   plannerSheet();
 };
+FEATURE_ACTIONS.calcMonth = v => {
+  const [y, m] = calcMonth.split('-').map(Number), dt = new Date(Date.UTC(y, m - 1 + Number(v), 1));
+  calcMonth = dt.toISOString().slice(0, 8) + '01'; plannerSheet();
+};
 FEATURE_ACTIONS.calcAdd = () => {
-  if (!calcFrom || calcTo < calcFrom) return;
+  if (!calcFrom) return;
+  if (!calcTo) calcTo = calcFrom;
   const r = leaveCalc(calcFrom, calcTo);
   if (r.overlap) return;
   S.leaves.push({ id: uid(), type: 'annual', from: calcFrom, to: calcTo });
   save(); closeSheet(); render();
   toast(`${t('leaveAdded')}: ${t('calcCost')} ${daysCount(r.cost)}`);
-  calcFrom = calcTo = null;
+  calcFrom = calcTo = calcMonth = null;
 };
 
 

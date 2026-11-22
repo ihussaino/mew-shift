@@ -402,3 +402,24 @@ div.punch{cursor:default}
 .calc-free{margin:0;padding-inline-start:18px;display:grid;gap:2px}
 .calc-cost{color:var(--warn)}
 .share-full{width:100%}
+
+/* اختيار فترة الإجازة مثل مواقع الطيران */
+.rp{padding:12px}
+.rp-nav{margin-bottom:8px}
+.rp-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:4px}
+.rp-grid.head span{text-align:center;font-size:11px;color:var(--muted);padding-bottom:4px}
+.rp-day{position:relative;height:44px;border:0;background:transparent;color:var(--ink);font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
+.rp-day b{font-weight:600;font-size:15px}
+.rp-day.red b{color:var(--hol)}
+.rp-day.past{opacity:.45}
+.rp-day.booked{opacity:.35;cursor:not-allowed;text-decoration:line-through}
+.rp-shift{display:block;width:16px;height:3px;border-radius:2px;background:transparent;box-shadow:none}
+.rp-shift.s-O{background:transparent;box-shadow:none}
+.rp-shift.s-M{background:var(--m)}.rp-shift.s-A{background:var(--a)}.rp-shift.s-N{background:var(--n)}
+[data-theme=dark] .rp-shift.s-N{background:#6C8BEA}
+.rp-day.in{background:var(--soft)}
+.rp-day.start,.rp-day.end{background:var(--primary);color:var(--on-primary)}
+.rp-day.start b,.rp-day.end b{color:var(--on-primary)}
+.rp-day.start{border-start-start-radius:12px;border-end-start-radius:12px}
+.rp-day.end{border-start-end-radius:12px;border-end-end-radius:12px}
+.rp-hint{text-align:center;margin-top:8px}
