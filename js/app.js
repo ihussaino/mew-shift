@@ -489,7 +489,7 @@ function renderCalendar() {
     <div class="seg group-seg" role="group" aria-label="${t('viewGroup')}">${['A', 'B', 'C', 'D', 'E'].map(x =>
       `<button type="button" class="${x === g ? 'on' : ''}" data-act="calGroup" data-v="${x}" aria-pressed="${x === g}">${x}${x === group() ? '<small>' + t('mine') + '</small>' : ''}</button>`).join('')}</div>
     ${mine ? '' : `<div class="card info-row viewing"><span>${t('viewingGroup')} <b>${g}</b></span><button type="button" class="link" data-act="calGroup" data-v="${group()}">${t('backToMine')}</button></div>`}
-    ${mine ? `<div class="grid2"><button type="button" class="btn feature-btn" data-act="openPlanner">✨ ${t('plannerTitle')}</button><button type="button" class="btn feature-btn" data-act="shareSchedule">${ICONS.share} ${t('shareSchedule')}</button></div>` : ''}
+    ${mine ? `<div class="grid2"><button type="button" class="btn feature-btn" data-act="openPlanner">🧮 ${t('plannerTitle')}</button><button type="button" class="btn feature-btn" data-act="shareSchedule">${ICONS.share} ${t('shareSchedule')}</button></div>` : ''}
     <div class="cols cal-cols"><div class="col">
     <div class="month-nav">
       <button type="button" class="icon-btn" data-act="month" data-v="-1" aria-label="${t('prevMonth')}">${S.settings.lang === 'ar' ? ICONS.right : ICONS.left}</button>

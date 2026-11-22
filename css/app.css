@@ -397,3 +397,7 @@ div.punch{cursor:default}
 .google-btn:hover{background:#f7f8fa}
 .or-sep{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
 .or-sep::before,.or-sep::after{content:"";flex:1;height:1px;background:var(--line,rgba(127,127,127,.25))}
+
+/* حاسبة الإجازة */
+.calc-free{margin:0;padding-inline-start:18px;display:grid;gap:2px}
+.calc-cost{color:var(--warn)}

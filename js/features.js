@@ -12,45 +12,6 @@ const SPECIAL_PAGE = QS.has('admin') || QS.has('view');
    الفكرة: الموظف يقدّم الإجازة على أيام الدوام فقط (كل مجموعة أيام متصلة طلب منفصل)،
    فأيام الراحة حولها مجانية، والجمعة والعطل داخل الإجازة لا تُخصم.
    ========================================================= */
-function planLeave(budget, fromDate, horizon) {
-  const g = group(), days = [];
-  for (let i = 0; i < horizon + 50; i++) {
-    const d = addDays(fromDate, i), s = shiftOf(g, d), booked = !!leaveOn(d);
-    const work = isWorkShift(s) && !booked;
-    days.push({ d, work, cost: work && !isFriday(d) && !holidayOn(d) ? 1 : 0 });
-  }
-  const off = i => i >= 0 && i < days.length && !days[i].work;
-  const found = [];
-  for (let s = 0; s < horizon; s++) {
-    if (!days[s].work) continue;
-    let cost = 0;
-    for (let e = s; e < Math.min(days.length - 1, s + 45); e++) {
-      if (days[e].work) cost += days[e].cost;
-      if (cost > budget) break;
-      if (!days[e].work) continue;
-      let a = s, b = e;
-      while (off(a - 1)) a--;
-      while (off(b + 1)) b++;
-      const segs = [];
-      let cur = null;
-      for (let k = s; k <= e; k++) {
-        if (days[k].work) { if (!cur) cur = { from: days[k].d, to: days[k].d }; else cur.to = days[k].d; }
-        else if (cur) { segs.push(cur); cur = null; }
-      }
-      if (cur) segs.push(cur);
-      found.push({ from: days[a].d, to: days[b].d, len: b - a + 1, cost, segs, workDays: days.slice(s, e + 1).filter(x => x.work).length });
-    }
-  }
-  found.sort((x, y) => y.len - x.len || x.cost - y.cost || (x.from < y.from ? -1 : 1));
-  const picked = [];
-  for (const f of found) {
-    if (picked.length >= 5) break;
-    if (picked.some(p => !(f.to < p.from || f.from > p.to))) continue;
-    picked.push(f);
-  }
-  return picked;
-}
-
 /* عدّ الأيام بصيغة عربية صحيحة */
 function daysCount(n) {
   if (S.settings.lang !== 'ar') return `${n} ${n === 1 ? 'day' : 'days'}`;
@@ -60,38 +21,65 @@ function daysCount(n) {
   if (n <= 10) return `${n} أيام`;
   return `${n} يوماً`;
 }
-let plannerBudget = 3;
-function plannerSheet(results) {
-  const ar = annualRemaining();
-  const list = results ? (results.length ? results.map((r, i) => `
-    <section class="plan-card">
-      <div class="row-between"><b class="plan-len">${daysCount(r.len)} ${t('daysOff')}</b><span class="pill ok">${t('costs')} ${daysCount(r.cost)}</span></div>
-      <span class="sm">${fmtDate(r.from)} ← ${fmtDate(r.to)}</span>
-      <span class="muted sm">${t('fileLeave')}: ${r.segs.map(x => x.from === x.to ? fmtShort(x.from) : fmtShort(x.from) + ' – ' + fmtShort(x.to)).join(' ، ')}${r.workDays > r.cost ? ' · ' + t('freeDaysNote') : ''}</span>
-      <button type="button" class="btn" data-act="planAdd" data-v="${i}">${t('addThisLeave')}</button>
-    </section>`).join('') : `<p class="muted">${t('noPlans')}</p>`) : '';
-  openSheet(`<h2>✨ ${t('plannerTitle')}</h2>
-    <p class="muted sm">${t('plannerIntro')}</p>
-    <form class="stack" data-form="planner">
-      <label class="row-between">${t('plannerBudget')}<input type="number" name="budget" min="1" max="15" value="${plannerBudget}" class="num"></label>
-      ${ar != null ? `<span class="muted sm">${t('balance')}: ${ar} ${t('day')}</span>` : ''}
-      <button type="submit" class="btn primary">${t('plannerFind')}</button>
-    </form>
-    ${list}`);
+/* حاسبة الإجازة: تختار من وإلى، وتعرف كم ينخصم (الجمعة والعطل الرسمية لا تُخصم) */
+let calcFrom = null, calcTo = null;
+function leaveCalc(from, to) {
+  const total = diffDays(to, from) + 1, fridays = [], hols = new Map();
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    const h = holidayOn(d);
+    if (h) { const k = h.ar + h.from; if (!hols.has(k)) hols.set(k, { h, days: [] }); hols.get(k).days.push(d); }
+    else if (isFriday(d)) fridays.push(d);
+  }
+  const cost = leaveDays(from, to).length;
+  const overlap = S.leaves.some(l => !(to < l.from || from > l.to));
+  return { total, cost, free: total - cost, fridays, hols: [...hols.values()], overlap };
 }
-let lastPlans = [];
-FEATURE_ACTIONS.openPlanner = () => plannerSheet(null);
+function plannerSheet() {
+  const ar = annualRemaining();
+  const today = todayISO();
+  if (!calcFrom) { calcFrom = addDays(today, 1); calcTo = addDays(today, 7); }
+  let out = '';
+  if (calcTo < calcFrom) out = `<div class="perm-preview bad">${t('calcBadRange')}</div>`;
+  else {
+    const r = leaveCalc(calcFrom, calcTo), after = ar == null ? null : ar - r.cost;
+    const freeList = [
+      ...r.fridays.map(d => `<li>${fmtShort(d)} · ${t('friday')}</li>`),
+      ...r.hols.map(x => `<li>${x.days.length > 1 ? fmtShort(x.days[0]) + ' – ' + fmtShort(x.days[x.days.length - 1]) : fmtShort(x.days[0])} · ${esc(x.h[S.settings.lang] || x.h.ar)}${x.days.length > 1 ? ' (' + daysCount(x.days.length) + ')' : ''}</li>`)
+    ].join('');
+    out = `<section class="plan-card stack sm-gap">
+      <div class="row-between"><span>${t('calcTotal')}</span><b>${daysCount(r.total)}</b></div>
+      <div class="row-between"><span>${t('calcCost')}</span><b class="calc-cost">${daysCount(r.cost)}</b></div>
+      <div class="row-between"><span>${t('calcFree')}</span><b>${daysCount(r.free)}</b></div>
+      ${freeList ? `<ul class="calc-free muted sm">${freeList}</ul>` : ''}
+      ${after != null ? `<div class="row-between"><span>${t('calcAfter')}</span><b>${daysCount(Math.max(0, after))}</b></div>` : ''}
+    </section>
+    ${after != null && after < 0 ? `<div class="perm-preview bad">${t('calcNoBalance')}</div>` : ''}
+    ${r.overlap ? `<div class="perm-preview bad">${t('calcOverlap')}</div>` : ''}
+    <button type="button" class="btn primary" data-act="calcAdd"${r.overlap ? ' disabled' : ''}>${t('addThisLeave')}</button>`;
+  }
+  openSheet(`<h2>🧮 ${t('plannerTitle')}</h2>
+    <p class="muted sm">${t('calcIntro')}</p>
+    <form class="stack" data-form="planner">
+      <div class="grid2"><label class="stack sm-gap sm">${t('fromDate')}<input type="date" name="from" value="${calcFrom}" class="time" required></label>
+      <label class="stack sm-gap sm">${t('toDate')}<input type="date" name="to" value="${calcTo}" class="time" required></label></div>
+      ${ar != null ? `<span class="muted sm">${t('balance')}: ${daysCount(ar)}</span>` : ''}
+      <button type="submit" class="btn">${t('calcGo')}</button>
+    </form>
+    ${out}`);
+}
+FEATURE_ACTIONS.openPlanner = () => plannerSheet();
 FEATURE_SUBMIT.planner = (f, fd) => {
-  plannerBudget = Math.max(1, Math.min(15, Number(fd.get('budget')) || 3));
-  lastPlans = planLeave(plannerBudget, addDays(todayISO(), 1), 180);
-  plannerSheet(lastPlans);
+  calcFrom = String(fd.get('from') || calcFrom); calcTo = String(fd.get('to') || calcTo);
+  plannerSheet();
 };
-FEATURE_ACTIONS.planAdd = v => {
-  const r = lastPlans[Number(v)];
-  if (!r) return;
-  r.segs.forEach(sg => S.leaves.push({ id: uid(), type: 'annual', from: sg.from, to: sg.to }));
+FEATURE_ACTIONS.calcAdd = () => {
+  if (!calcFrom || calcTo < calcFrom) return;
+  const r = leaveCalc(calcFrom, calcTo);
+  if (r.overlap) return;
+  S.leaves.push({ id: uid(), type: 'annual', from: calcFrom, to: calcTo });
   save(); closeSheet(); render();
-  toast(`${t('leaveAdded')}: ${daysCount(r.len)} ${t('daysOff')}`);
+  toast(`${t('leaveAdded')}: ${t('calcCost')} ${daysCount(r.cost)}`);
+  calcFrom = calcTo = null;
 };
 
 /* =========================================================
