@@ -57,7 +57,7 @@ function plannerSheet() {
     ${r.overlap ? `<div class="perm-preview bad">${t('calcOverlap')}</div>` : ''}
     <button type="button" class="btn primary" data-act="calcAdd"${r.overlap ? ' disabled' : ''}>${t('addThisLeave')}</button>`;
   }
-  openSheet(`<h2>🧮 ${t('plannerTitle')}</h2>
+  openSheet(`<h2>🧮 ${t('calcTitle')}</h2>
     <p class="muted sm">${t('calcIntro')}</p>
     <form class="stack" data-form="planner">
       <div class="grid2"><label class="stack sm-gap sm">${t('fromDate')}<input type="date" name="from" value="${calcFrom}" class="time" required></label>
@@ -67,7 +67,7 @@ function plannerSheet() {
     </form>
     ${out}`);
 }
-FEATURE_ACTIONS.openPlanner = () => plannerSheet();
+FEATURE_ACTIONS.openCalc = () => plannerSheet();
 FEATURE_SUBMIT.planner = (f, fd) => {
   calcFrom = String(fd.get('from') || calcFrom); calcTo = String(fd.get('to') || calcTo);
   plannerSheet();
@@ -80,6 +80,66 @@ FEATURE_ACTIONS.calcAdd = () => {
   save(); closeSheet(); render();
   toast(`${t('leaveAdded')}: ${t('calcCost')} ${daysCount(r.cost)}`);
   calcFrom = calcTo = null;
+};
+
+
+/* المخطط الذكي: تكتب مدة الراحة اللي تبيها، ويدور على أقل خصم في الستة أشهر الجاية.
+   الإجازة متصلة من أول يوم دوام إلى آخر يوم دوام داخل الفترة، وأيام الراحة على الأطراف ما تحتاج إجازة. */
+let smartLen = 9, smartPlans = null;
+function smartPlan(len, start, horizon) {
+  const g = group(), N = horizon + len + 10, days = [];
+  for (let i = 0; i < N; i++) { const d = addDays(start, i); days.push({ d, work: isWorkShift(shiftOf(g, d)), booked: !!leaveOn(d) }); }
+  const found = [];
+  for (let s = 0; s < horizon; s++) {
+    const w = days.slice(s, s + len);
+    if (w.some(x => x.booked)) continue;
+    const wi = w.map((x, i) => x.work ? i : -1).filter(i => i >= 0);
+    if (!wi.length) continue;
+    const from = w[wi[0]].d, to = w[wi[wi.length - 1]].d;
+    let a = s, b = s + len - 1;
+    while (a > 0 && !days[a - 1].work && !days[a - 1].booked) a--;
+    while (b < N - 1 && !days[b + 1].work && !days[b + 1].booked) b++;
+    found.push({ from, to, cost: leaveDays(from, to).length, restFrom: days[a].d, restTo: days[b].d, rest: b - a + 1 });
+  }
+  found.sort((x, y) => x.cost - y.cost || y.rest - x.rest || (x.from < y.from ? -1 : 1));
+  const picked = [];
+  for (const r of found) {
+    if (picked.some(p => !(r.restTo < p.restFrom || r.restFrom > p.restTo))) continue;
+    picked.push(r);
+    if (picked.length === 5) break;
+  }
+  return picked;
+}
+function smartSheet() {
+  const ar = annualRemaining();
+  const list = smartPlans ? (smartPlans.length ? smartPlans.map((r, i) => `
+    <section class="plan-card stack sm-gap">
+      <div class="row-between"><b class="plan-len">${t('restFor')} ${daysCount(r.rest)}</b><span class="pill ok">${t('costs')} ${daysCount(r.cost)}</span></div>
+      <span class="sm">${t('restPeriod')}: ${fmtDate(r.restFrom)} ← ${fmtDate(r.restTo)}</span>
+      <span class="muted sm">${t('leavePeriod')}: ${r.from === r.to ? fmtShort(r.from) : fmtShort(r.from) + ' – ' + fmtShort(r.to)}${ar != null && r.cost > ar ? ' · ' + t('calcNoBalance') : ''}</span>
+      <button type="button" class="btn" data-act="smartAdd" data-v="${i}">${t('addThisLeave')}</button>
+    </section>`).join('') : `<p class="muted">${t('noPlans')}</p>`) : '';
+  openSheet(`<h2>✨ ${t('plannerTitle')}</h2>
+    <p class="muted sm">${t('smartIntro')}</p>
+    <form class="stack" data-form="smart">
+      <label class="row-between">${t('smartLen')}<input type="number" name="len" min="1" max="60" value="${smartLen}" class="num" inputmode="numeric"></label>
+      ${ar != null ? `<span class="muted sm">${t('balance')}: ${daysCount(ar)}</span>` : ''}
+      <button type="submit" class="btn primary">${t('plannerFind')}</button>
+    </form>
+    ${list}`);
+}
+FEATURE_ACTIONS.openPlanner = () => { smartPlans = null; smartSheet(); };
+FEATURE_SUBMIT.smart = (f, fd) => {
+  smartLen = Math.max(1, Math.min(60, Number(fd.get('len')) || 9));
+  smartPlans = smartPlan(smartLen, addDays(todayISO(), 1), 180);
+  smartSheet();
+};
+FEATURE_ACTIONS.smartAdd = v => {
+  const r = smartPlans && smartPlans[Number(v)];
+  if (!r) return;
+  S.leaves.push({ id: uid(), type: 'annual', from: r.from, to: r.to });
+  save(); closeSheet(); render();
+  toast(`${t('leaveAdded')}: ${t('calcCost')} ${daysCount(r.cost)}`);
 };
 
 /* =========================================================

@@ -401,3 +401,4 @@ div.punch{cursor:default}
 /* حاسبة الإجازة */
 .calc-free{margin:0;padding-inline-start:18px;display:grid;gap:2px}
 .calc-cost{color:var(--warn)}
+.share-full{width:100%}
